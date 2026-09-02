@@ -41,6 +41,14 @@ export function cleanPhoneForWa(phone: string): string {
 export function formatDateBR(dateStr?: string | null): string {
   if (!dateStr) return '—';
   try {
+    // If dateStr is in YYYY-MM-DD or YYYY-MM-DDTHH:mm format, parse date parts directly to avoid UTC timezone shifts
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const datePart = dateStr.split('T')[0];
+      const parts = datePart.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('pt-BR', {

@@ -54,7 +54,7 @@ function getInitialData(): DatabaseSchema {
     date: eventDate.toISOString().split('T')[0],
     time: '19:00',
     location: 'Grupo Ativa - Centro de Treinamento',
-    address: 'Av. Paulista, 2100 - Bela Vista, São Paulo - SP',
+    address: 'R. Bela Cintra, 299 - 3º Andar - Cerqueira César, São Paulo - SP, 01415-001',
     bannerUrl:
       'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
     logoUrl: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=300&q=80',
@@ -1196,6 +1196,13 @@ function escapeHtml(str: string): string {
 function formatDateDisplay(dateStr?: string | null): string {
   if (!dateStr) return '';
   try {
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const datePart = dateStr.split('T')[0];
+      const parts = datePart.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('pt-BR', {
@@ -1510,14 +1517,27 @@ function generateOgHtml(req: express.Request, rawHtml: string, code?: string, ev
   const currentUrl = `${baseUrl}${req.originalUrl.split('?')[0]}`;
 
   let ogImageUrl = '';
+  let ogImageType = 'image/jpeg';
+
   if (inv?.customShareImageUrl && inv.customShareImageUrl.startsWith('http')) {
     ogImageUrl = inv.customShareImageUrl;
+    ogImageType = inv.customShareImageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
   } else if (event?.shareImageUrl && event.shareImageUrl.startsWith('http')) {
     ogImageUrl = event.shareImageUrl;
+    ogImageType = event.shareImageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+  } else if (event?.bannerUrl && event.bannerUrl.startsWith('http')) {
+    ogImageUrl = event.bannerUrl;
+    ogImageType = event.bannerUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+  } else if (inv?.customShareImageUrl && inv.customShareImageUrl.startsWith('data:image')) {
+    ogImageUrl = `${baseUrl}/api/og-image/invitation/${inv.code}`;
+    ogImageType = inv.customShareImageUrl.includes('image/png') ? 'image/png' : 'image/jpeg';
+  } else if (event?.shareImageUrl && event.shareImageUrl.startsWith('data:image')) {
+    ogImageUrl = `${baseUrl}/api/og-image/event/${event.id}`;
+    ogImageType = event.shareImageUrl.includes('image/png') ? 'image/png' : 'image/jpeg';
   } else {
-    ogImageUrl = inv
-      ? `${baseUrl}/api/og-image/invitation/${inv.code}`
-      : `${baseUrl}/api/og-image/event/${event?.id || 'default'}`;
+    // Fallback to high-res event banner or direct raster image for WhatsApp crawler
+    ogImageUrl = event?.bannerUrl || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
+    ogImageType = 'image/jpeg';
   }
 
   let html = rawHtml;
@@ -1537,12 +1557,13 @@ function generateOgHtml(req: express.Request, rawHtml: string, code?: string, ev
     <meta property="og:description" content="${escapeHtml(ogDescription)}" />
     <meta property="og:image" content="${escapeHtml(ogImageUrl)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(ogImageUrl)}" />
-    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:type" content="${ogImageType}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="${escapeHtml(eventTitle)}" />
     <meta property="og:url" content="${escapeHtml(currentUrl)}" />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escapeHtml(ogTitle)}" />
     <meta name="twitter:description" content="${escapeHtml(ogDescription)}" />
