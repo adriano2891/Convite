@@ -1,0 +1,6 @@
+{
+  "name": "Convite & Confirmação de Presença",
+  "description": "Sistema corporativo em tempo real para gestão de convites, confirmação de presença (RSVP) e check-in para síndicos e zeladores de condomínios.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

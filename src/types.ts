@@ -1,0 +1,110 @@
+export type InvitationStatus =
+  | 'not_viewed'
+  | 'viewed'
+  | 'pending'
+  | 'confirmed'
+  | 'declined'
+  | 'cancelled'
+  | 'checked_in';
+
+export type AttendeeRole = 'none' | 'manager' | 'janitor' | 'both';
+
+export interface HistoryEntry {
+  id: string;
+  timestamp: string;
+  type:
+    | 'created'
+    | 'sent'
+    | 'viewed'
+    | 'confirmed'
+    | 'declined'
+    | 'cancelled'
+    | 'checked_in'
+    | 'checkin_undone'
+    | 'whatsapp_opened'
+    | 'note_added'
+    | 'status_changed'
+    | 'updated';
+  description: string;
+  details?: string;
+}
+
+export interface WhatsAppTemplates {
+  confirmed: string;
+  viewedNotConfirmed: string;
+  notViewed: string;
+  reminder: string;
+  thankYou: string;
+}
+
+export interface CondoEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  address: string;
+  bannerUrl: string;
+  logoUrl: string;
+  presentationText: string;
+  shareImageUrl?: string;
+  shareTitle?: string;
+  shareDescription?: string;
+  requireJanitor: boolean;
+  maxParticipants: number;
+  confirmationDeadline: string; // ISO or YYYY-MM-DDTHH:mm
+  waitingListEnabled: boolean;
+  status: 'active' | 'archived' | 'draft';
+  whatsappTemplates: WhatsAppTemplates;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Invitation {
+  id: string;
+  code: string;
+  eventId: string;
+  condoName: string;
+  managerName: string;
+  janitorName?: string;
+  whatsapp: string;
+  attendeeRole: AttendeeRole;
+  participantCount: number;
+  status: InvitationStatus;
+  viewCount: number;
+  firstViewedAt: string | null;
+  lastViewedAt: string | null;
+  confirmedAt: string | null;
+  declinedAt: string | null;
+  checkedInAt: string | null;
+  customShareImageUrl?: string;
+  internalNotes?: string;
+  history: HistoryEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  eventId: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  type: 'confirmed' | 'declined' | 'viewed' | 'check_in' | 'limit_reached' | 'info';
+  invitationCode?: string;
+  read: boolean;
+}
+
+export interface DashboardMetrics {
+  totalInvitations: number;
+  notViewed: number;
+  viewedOnly: number;
+  pending: number;
+  confirmed: number;
+  declined: number;
+  totalParticipants: number;
+  maxCapacity: number;
+  occupancyRate: number;
+  checkInsCount: number;
+  needsFollowUpCount: number;
+}
