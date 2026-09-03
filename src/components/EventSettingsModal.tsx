@@ -474,22 +474,15 @@ export const EventSettingsModal: React.FC<Props> = ({
                   className="hidden"
                 />
 
-                {/* URL Direct Input & Upload Trigger */}
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="url"
-                    value={bannerUrl}
-                    onChange={(e) => setBannerUrl(e.target.value)}
-                    placeholder="Cole a URL da imagem ou clique em Enviar Foto..."
-                    className="flex-1 bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-900 placeholder-slate-400 font-mono focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 transition"
-                  />
+                {/* Upload Trigger (sem exibir a URL técnica crua) */}
+                <div>
                   <button
                     type="button"
                     onClick={() => bannerFileInputRef.current?.click()}
-                    className="px-3.5 py-2 bg-white hover:bg-slate-100 text-teal-800 border border-slate-300 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
+                    className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-teal-800 border border-slate-300 hover:border-teal-600 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
                   >
-                    <Upload size={14} />
-                    <span>Upload Arquivo</span>
+                    <Upload size={14} className="text-teal-700" />
+                    <span>Upload de Nova Imagem / Capa</span>
                   </button>
                 </div>
 
