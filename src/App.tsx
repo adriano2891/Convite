@@ -14,12 +14,20 @@ export default function App() {
       const searchParams = new URLSearchParams(window.location.search);
 
       const codeFromParam = searchParams.get('c') || searchParams.get('code');
+      const isAdminQuery =
+        searchParams.get('admin') === 'true' ||
+        searchParams.has('admin') ||
+        searchParams.get('painel') === 'true' ||
+        searchParams.has('painel') ||
+        searchParams.has('dashboard');
 
       // Check path /convite/CODE or /c/CODE
       const conviteMatch = path.match(/^\/(?:convite|c)\/([A-Za-z0-9_-]+)/i);
       const hashMatch = hash.match(/^#(?:convite|c)\/([A-Za-z0-9_-]+)/i);
 
-      if (conviteMatch && conviteMatch[1]) {
+      if (isAdminQuery || path.startsWith('/admin') || path.startsWith('/painel') || hash === '#admin' || hash === '#painel') {
+        setCurrentRoute('admin');
+      } else if (conviteMatch && conviteMatch[1]) {
         setCurrentRoute('public');
         setInvitationCode(conviteMatch[1]);
       } else if (hashMatch && hashMatch[1]) {
@@ -28,8 +36,6 @@ export default function App() {
       } else if (codeFromParam) {
         setCurrentRoute('public');
         setInvitationCode(codeFromParam);
-      } else if (path.startsWith('/admin') || hash === '#admin') {
-        setCurrentRoute('admin');
       } else if (path === '/convite' || path === '/convite/' || path === '/' || hash === '#convite') {
         // Default to public generic open invitation form
         setCurrentRoute('public');

@@ -589,7 +589,7 @@ export const PublicInvitation: React.FC<Props> = ({
           {/* Arte / Capa Interativa Oficial com Hiperlinks Invisíveis */}
           {event?.bannerUrl ? (
             <div
-              className="w-full overflow-hidden flex items-center justify-center border-b border-teal-100/90"
+              className="w-full overflow-hidden flex items-center justify-center"
               style={{
                 background: 'linear-gradient(145deg, #e8f7f6 0%, #f4faf9 50%, #e1f4f2 100%)'
               }}
@@ -621,102 +621,18 @@ export const PublicInvitation: React.FC<Props> = ({
                   {event.description}
                 </p>
               )}
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={openFullscreenForm}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-sm font-bold shadow-md cursor-pointer"
+                >
+                  <CheckCircle2 size={18} />
+                  <span>Confirmar presença</span>
+                </button>
+              </div>
             </div>
           )}
-
-          {/* Dados do Evento (Data, Horário e Local) */}
-          <div className="px-3.5 sm:px-5 py-3 bg-white/90 border-t border-teal-100/90 text-xs sm:text-sm text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="flex items-center gap-2">
-              <Calendar size={15} className="text-[#007A78] shrink-0" />
-              <span>
-                <strong className="text-slate-900">{event ? formatDateBR(event.date) : ''}</strong>
-                {event?.time ? ` às ${event.time}` : ''}
-              </span>
-            </div>
-            {event?.address && (
-              <div className="flex items-center gap-2 min-w-0">
-                <MapPin size={15} className="text-[#007A78] shrink-0" />
-                <span className="truncate text-slate-700" title={event.address}>
-                  {event.address}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Botões Principais: “Confirmar presença” e “Como chegar” (Lado a lado em desktop/tablet, 1 coluna em celular) */}
-          <div className="p-3.5 sm:p-5 bg-gradient-to-r from-teal-50/80 via-white to-teal-50/80 border-t border-teal-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-            {/* Botão 1: Confirmar presença */}
-            <button
-              type="button"
-              id="btn-abrir-confirmacao-presenca"
-              onClick={openFullscreenForm}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-sm sm:text-base font-black transition shadow-lg shadow-emerald-700/20 min-h-[48px] cursor-pointer tracking-wide"
-            >
-              <CheckCircle2 size={18} />
-              <span>
-                {showSuccessCard
-                  ? '✓ Presença Confirmada'
-                  : 'Confirmar presença'}
-              </span>
-            </button>
-
-            {/* Botão 2: Como chegar (Google Maps) */}
-            <a
-              id="btn-como-chegar-maps"
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                `${event?.location || 'Grupo Ativa'}, ${event?.address || ''}`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 bg-[#007A78] hover:bg-[#006866] active:bg-[#005452] text-white rounded-xl text-sm sm:text-base font-bold transition shadow-md shadow-teal-900/15 border border-teal-700/30 min-h-[48px] cursor-pointer tracking-wide"
-              title="Abrir localização no Google Maps"
-            >
-              <MapPin size={18} />
-              <span>Como chegar</span>
-            </a>
-          </div>
-
-          {/* Ações Secundárias do Convite: Salvar Convite, Baixar em PDF, Compartilhar no WhatsApp */}
-          <div className="px-3.5 sm:px-5 pb-3.5 sm:pb-4 pt-2.5 bg-slate-50/90 border-t border-teal-100/90 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Salvar Convite */}
-              <button
-                type="button"
-                id="btn-salvar-convite"
-                onClick={handleSaveInviteLocal}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition border border-slate-200 shadow-2xs min-h-[44px] cursor-pointer"
-                title="Salvar este convite nos favoritos"
-              >
-                <Bookmark size={14} className={isSavedLocal ? 'text-[#007A78] fill-[#007A78]' : 'text-slate-400'} />
-                <span>{isSavedLocal ? 'Salvo!' : 'Salvar'}</span>
-              </button>
-
-              {/* Baixar em PDF */}
-              <button
-                type="button"
-                id="btn-baixar-pdf"
-                onClick={handleDownloadPdf}
-                disabled={isExportingPdf}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition border border-slate-200 shadow-2xs disabled:opacity-50 min-h-[44px] cursor-pointer"
-                title="Baixar convite em PDF com hiperlinks interativos"
-              >
-                <Download size={14} className="text-[#007A78]" />
-                <span>{isExportingPdf ? 'Gerando...' : 'Baixar PDF'}</span>
-              </button>
-            </div>
-
-            {/* Compartilhar no WhatsApp */}
-            <button
-              type="button"
-              id="btn-compartilhar-whatsapp"
-              onClick={handleShareWhatsApp}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition shadow-2xs min-h-[44px] cursor-pointer"
-              title="Compartilhar convite no WhatsApp"
-            >
-              <MessageCircle size={14} className="text-emerald-600" />
-              <span>WhatsApp</span>
-            </button>
-          </div>
         </div>
 
         {/* Rodapé institucional discreto */}
