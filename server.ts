@@ -34,6 +34,17 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 // Serve uploaded static assets directly with permanent URL access
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Bulletproof fallback: If an uploaded file is not found (e.g. ephemeral disk after restart on Render),
+// NEVER return index.html! Serve the default cover image as PNG so the image never breaks
+app.use('/uploads', (req, res) => {
+  const defaultCover = path.join(process.cwd(), 'public', 'covers', 'default-cover.png');
+  if (fs.existsSync(defaultCover)) {
+    res.setHeader('Content-Type', 'image/png');
+    return res.sendFile(defaultCover);
+  }
+  return res.status(404).send('Image not found');
+});
+
 interface DatabaseSchema {
   adminPin: string;
   events: CondoEvent[];
@@ -70,50 +81,47 @@ function getInitialData(): DatabaseSchema {
 
   const event1: CondoEvent = {
     id: 'evt-2026-seguranca',
-    title: 'Treinamento Intelbras + Grupo Ativa',
-    date: eventDate.toISOString().split('T')[0],
-    time: '19:00',
-    location: 'Grupo Ativa - Centro de Treinamento',
-    address: 'R. Bela Cintra, 299 - 3º Andar - Cerqueira César, São Paulo - SP, 01415-001',
-    bannerUrl:
-      'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
+    title: 'Convenção Nacional Ativa 2026',
+    date: '2026-09-21',
+    time: '14:00',
+    location: 'Centro de Convenções Ativa',
+    address: 'Av. Paulista, 1000 - Bela Vista, SP',
+    bannerUrl: '/covers/default-cover.png',
     logoUrl: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=300&q=80',
-    presentationText:
-      'Convidamos cordialmente o corpo diretivo e operacional do seu condomínio para uma noite exclusiva de atualização sobre tecnologias de portaria remota, automação e coquetel de networking.',
-    shareTitle: 'Treinamento Intelbras + Grupo Ativa',
-    shareDescription: 'Convite especial para Síndicos e Zeladores. Confirme sua presença.',
-    requireJanitor: false,
+    presentationText: 'Bem-vindo à Convenção Nacional Ativa. Confirme sua presença abaixo.',
+    shareTitle: 'Convenção Nacional Ativa 2026',
+    shareDescription: 'Convite oficial para a Convenção Nacional Ativa 2026. Confirme sua presença.',
+    requireJanitor: true,
     maxParticipants: 50,
-    confirmationDeadline: deadlineDate.toISOString().split('T')[0],
+    confirmationDeadline: '2026-09-12',
     waitingListEnabled: true,
     status: 'active',
     coverHotspots: [
       {
-        id: 'hs-rsvp-1',
+        id: 'hs-1',
         name: 'Confirmar Presença',
         actionType: 'confirm_rsvp',
         targetUrl: '#formulario',
         openInNewTab: false,
-        x: 15,
-        y: 73,
-        width: 70,
-        height: 14
+        x: 7.2,
+        y: 61.7,
+        width: 42,
+        height: 7.5
       },
       {
-        id: 'hs-maps-2',
-        name: 'Como Chegar (Maps)',
+        id: 'hs-2',
+        name: 'Como Chegar',
         actionType: 'google_maps',
-        targetUrl:
-          'https://www.google.com/maps/search/?api=1&query=R.+Bela+Cintra%2C+299+-+Cerqueira+C%C3%A9sar%2C+S%C3%A3o+Paulo+-+SP',
+        targetUrl: 'https://maps.google.com/?q=Av.+Paulista,+1000+-+Bela+Vista,+SP',
         openInNewTab: true,
-        x: 15,
-        y: 88,
-        width: 70,
-        height: 10
+        x: 50.6,
+        y: 61.8,
+        width: 44.1,
+        height: 7.8
       }
     ],
     whatsappTemplates: { ...defaultTemplates },
-    createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: '2026-08-28T02:43:42.858Z',
     updatedAt: new Date().toISOString()
   };
 

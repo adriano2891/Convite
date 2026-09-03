@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { CoverHotspot } from '../types';
-import { ExternalLink, Sparkles } from 'lucide-react';
+import { ExternalLink, Sparkles, CheckCircle2, MapPin } from 'lucide-react';
 
 interface Props {
   imageUrl: string;
@@ -31,6 +31,24 @@ export const InteractiveCoverViewer: React.FC<Props> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
+  const [currentSrc, setCurrentSrc] = useState<string>(imageUrl || '/covers/default-cover.png');
+  const [hasError, setHasError] = useState<boolean>(false);
+
+  useEffect(() => {
+    setCurrentSrc(imageUrl || '/covers/default-cover.png');
+    setHasError(false);
+  }, [imageUrl]);
+
+  const handleImageError = () => {
+    // If the custom image failed, automatically fall back to the project default cover
+    if (currentSrc !== '/covers/default-cover.png') {
+      console.warn(`[Cover] Failed to load ${currentSrc}, falling back to /covers/default-cover.png`);
+      setCurrentSrc('/covers/default-cover.png');
+    } else {
+      console.warn('[Cover] Default cover also failed to load, switching to interactive fallback UI');
+      setHasError(true);
+    }
+  };
 
   const handleHotspotClick = (e: React.MouseEvent, spot: CoverHotspot) => {
     // If in admin editing mode, select the hotspot for editing
@@ -88,6 +106,42 @@ export const InteractiveCoverViewer: React.FC<Props> = ({
     }
   };
 
+  if (hasError) {
+    return (
+      <div className={`w-full min-h-[420px] p-8 flex flex-col items-center justify-center text-center bg-gradient-to-br from-[#005B58] via-[#007A78] to-[#009688] text-white ${className}`}>
+        <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-4 shadow-lg border border-white/30">
+          <Sparkles className="w-7 h-7 text-teal-100" />
+        </div>
+        <span className="px-3.5 py-1 rounded-full bg-white/20 text-teal-100 text-xs font-bold uppercase tracking-wider mb-2 border border-white/30">
+          Convite Oficial • Grupo Ativa
+        </span>
+        <h2 className="text-2xl sm:text-3xl font-black mb-3 tracking-tight text-white max-w-md">
+          {altText}
+        </h2>
+        <p className="text-teal-100 text-xs sm:text-sm max-w-sm mb-6 leading-relaxed">
+          Clique nos botões abaixo para confirmar sua presença ou conferir a localização do evento.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+          {hotspots.map((spot) => (
+            <button
+              key={spot.id}
+              type="button"
+              onClick={(e) => handleHotspotClick(e, spot)}
+              className={`w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm shadow-md transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${
+                spot.actionType === 'confirm_rsvp'
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                  : 'bg-white/90 hover:bg-white text-teal-900'
+              }`}
+            >
+              {spot.actionType === 'confirm_rsvp' ? <CheckCircle2 size={16} /> : <MapPin size={16} />}
+              <span>{spot.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -96,9 +150,10 @@ export const InteractiveCoverViewer: React.FC<Props> = ({
     >
       {/* Background artwork */}
       <img
-        src={imageUrl}
+        src={currentSrc}
         alt={altText}
         referrerPolicy="no-referrer"
+        onError={handleImageError}
         onLoad={(e) => {
           const target = e.currentTarget;
           if (onImageLoad) {

@@ -228,16 +228,75 @@ export const PublicInvitation: React.FC<Props> = ({
 
         if (mode === 'generic') {
           // Load active event for generic open form
-          const data = await getActiveEventPublic();
-          setEvent(data.event);
-          setConfirmedCount(data.confirmedParticipants);
-          setAvailableSlots(data.availableSlots);
-          setInvitation(null);
-          setShowSuccessCard(false);
-          setShowDeclinedCard(false);
+          try {
+            const data = await getActiveEventPublic();
+            setEvent(data.event);
+            setConfirmedCount(data.confirmedParticipants);
+            setAvailableSlots(data.availableSlots);
+            setInvitation(null);
+            setShowSuccessCard(false);
+            setShowDeclinedCard(false);
 
-          if (data.event) {
-            document.title = `${data.event.shareTitle || data.event.title} | Formulário de Confirmação Grupo Ativa`;
+            if (data.event) {
+              document.title = `${data.event.shareTitle || data.event.title} | Formulário de Confirmação Grupo Ativa`;
+              try {
+                localStorage.setItem('ativa_cached_public_event', JSON.stringify(data));
+              } catch (e) {
+                // ignore quota
+              }
+            }
+          } catch (fetchErr) {
+            console.warn('[Invitation] Failed to fetch active event from server, checking local cache:', fetchErr);
+            const cached = localStorage.getItem('ativa_cached_public_event');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              setEvent(parsed.event);
+              setConfirmedCount(parsed.confirmedParticipants || 0);
+              setAvailableSlots(parsed.availableSlots || 50);
+            } else {
+              // Fallback to default event data
+              setEvent({
+                id: 'evt-2026-seguranca',
+                title: 'Convenção Nacional Ativa 2026',
+                date: '2026-09-21',
+                time: '14:00',
+                location: 'Centro de Convenções Ativa',
+                address: 'Av. Paulista, 1000 - Bela Vista, SP',
+                bannerUrl: '/covers/default-cover.png',
+                presentationText: 'Bem-vindo à Convenção Nacional Ativa. Confirme sua presença abaixo.',
+                requireJanitor: true,
+                maxParticipants: 50,
+                confirmationDeadline: '2026-09-12',
+                waitingListEnabled: true,
+                status: 'active',
+                coverHotspots: [
+                  {
+                    id: 'hs-1',
+                    name: 'Confirmar Presença',
+                    actionType: 'confirm_rsvp',
+                    targetUrl: '#formulario',
+                    openInNewTab: false,
+                    x: 7.2,
+                    y: 61.7,
+                    width: 42,
+                    height: 7.5
+                  },
+                  {
+                    id: 'hs-2',
+                    name: 'Como Chegar',
+                    actionType: 'google_maps',
+                    targetUrl: 'https://maps.google.com/?q=Av.+Paulista,+1000+-+Bela+Vista,+SP',
+                    openInNewTab: true,
+                    x: 50.6,
+                    y: 61.8,
+                    width: 44.1,
+                    height: 7.8
+                  }
+                ],
+                createdAt: '2026-08-28T02:43:42.858Z',
+                updatedAt: new Date().toISOString()
+              });
+            }
           }
           setCondoName('');
           setManagerName('');
@@ -588,20 +647,64 @@ export const PublicInvitation: React.FC<Props> = ({
         >
           {/* Arte / Capa Interativa Oficial com Hiperlinks Invisíveis */}
           {event?.bannerUrl ? (
-            <div
-              className="w-full overflow-hidden flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(145deg, #e8f7f6 0%, #f4faf9 50%, #e1f4f2 100%)'
-              }}
-            >
-              <InteractiveCoverViewer
-                imageUrl={event.bannerUrl}
-                altText={event.title}
-                hotspots={effectiveHotspots}
-                showHotspotBorders={false}
-                interactive={true}
-                onActionTrigger={handleCoverActionTrigger}
-              />
+            <div>
+              <div
+                className="w-full overflow-hidden flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(145deg, #e8f7f6 0%, #f4faf9 50%, #e1f4f2 100%)'
+                }}
+              >
+                <InteractiveCoverViewer
+                  imageUrl={event.bannerUrl}
+                  altText={event.title}
+                  hotspots={effectiveHotspots}
+                  showHotspotBorders={false}
+                  interactive={true}
+                  onActionTrigger={handleCoverActionTrigger}
+                />
+              </div>
+
+              {/* Barra de Informações do Evento e Acesso Direto à Confirmação */}
+              <div className="p-4 sm:p-5 bg-white/95 border-t border-teal-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="inline-block px-2 py-0.5 rounded-md bg-teal-50 text-[#007A78] font-bold text-[10px] uppercase tracking-wider border border-teal-100">
+                      Convite Oficial
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {event.date ? formatDateBR(event.date) : '21/09/2026'} às {event.time || '14:00'}
+                    </span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-slate-800 tracking-tight truncate">
+                    {event.title}
+                  </h2>
+                  <p className="text-xs text-slate-500 truncate mt-0.5 flex items-center gap-1">
+                    <MapPin size={12} className="text-[#007A78] shrink-0" />
+                    <span>{event.address || event.location}</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                  <button
+                    type="button"
+                    onClick={openFullscreenForm}
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition transform active:scale-95"
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>Confirmar presença</span>
+                  </button>
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(event.address || event.location || 'Av. Paulista, 1000 - Bela Vista, SP')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1 px-3 py-2.5 bg-teal-50 hover:bg-teal-100 text-[#007A78] rounded-xl text-xs sm:text-sm font-semibold border border-teal-200 cursor-pointer"
+                    title="Ver no Google Maps"
+                  >
+                    <MapPin size={15} />
+                    <span className="hidden xs:inline">Mapa</span>
+                  </a>
+                </div>
+              </div>
             </div>
           ) : (
             <div

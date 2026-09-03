@@ -8,7 +8,7 @@
       "time": "14:00",
       "location": "Centro de Convenções Ativa",
       "address": "Av. Paulista, 1000 - Bela Vista, SP",
-      "bannerUrl": "/uploads/cover-1788435048500-ebnwy0.png",
+      "bannerUrl": "/covers/default-cover.png",
       "logoUrl": "https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=300&q=80",
       "presentationText": "Bem-vindo à Convenção Nacional Ativa. Confirme sua presença abaixo.",
       "requireJanitor": true,
@@ -24,7 +24,7 @@
         "thankYou": "Olá, {Nome}! Agradecemos imensamente a sua presença no {Evento}. Foi uma honra contar com você e com o condomínio {Condominio}!\n\nEm breve enviaremos os materiais e certificados."
       },
       "createdAt": "2026-08-28T02:43:42.858Z",
-      "updatedAt": "2026-09-03T11:35:14.574Z",
+      "updatedAt": "2026-09-03T12:00:00.000Z",
       "coverHotspots": [
         {
           "id": "hs-1",
@@ -32,21 +32,21 @@
           "actionType": "confirm_rsvp",
           "targetUrl": "#formulario",
           "openInNewTab": false,
-          "x": 25,
-          "y": 70,
-          "width": 50,
-          "height": 12
+          "x": 7.2,
+          "y": 61.7,
+          "width": 42,
+          "height": 7.5
         },
         {
           "id": "hs-2",
           "name": "Como Chegar",
           "actionType": "google_maps",
-          "targetUrl": "https://maps.google.com",
+          "targetUrl": "https://maps.google.com/?q=Av.+Paulista,+1000+-+Bela+Vista,+SP",
           "openInNewTab": true,
-          "x": 25,
-          "y": 85,
-          "width": 50,
-          "height": 10
+          "x": 50.6,
+          "y": 61.8,
+          "width": 44.1,
+          "height": 7.8
         }
       ]
     }
