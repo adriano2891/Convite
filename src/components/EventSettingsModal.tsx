@@ -24,6 +24,10 @@ import { updateEvent, createEvent, deleteEvent, changeAdminPassword, uploadImage
 
 const QUICK_COVER_PRESETS = [
   {
+    name: 'Cartaz Oficial Intelbras (Padrão)',
+    url: '/covers/default-cover.png'
+  },
+  {
     name: 'Workshop & Convenção',
     url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80'
   },

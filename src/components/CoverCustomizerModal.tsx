@@ -33,6 +33,13 @@ interface CoverPreset {
 
 const COVER_PRESETS: CoverPreset[] = [
   {
+    id: 'preset-oficial-intelbras',
+    name: 'Cartaz Oficial Intelbras (Padrão)',
+    category: 'Oficial',
+    url: '/covers/default-cover.png',
+    description: 'Cartaz oficial de Treinamento Intelbras para Síndicos e Zeladores'
+  },
+  {
     id: 'preset-workshop',
     name: 'Workshop & Convenção',
     category: 'Eventos',
