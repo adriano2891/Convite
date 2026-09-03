@@ -124,7 +124,11 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [pdfProgressText, setPdfProgressText] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastData, setToastData] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+    onRetry?: () => void;
+  } | null>(null);
 
   // Tab: 'editor' | 'change_image'
   const [editorTab, setEditorTab] = useState<'editor' | 'change_image'>('editor');
@@ -159,9 +163,15 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
 
   const selectedHotspot = hotspots.find((h) => h.id === selectedHotspotId) || null;
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (
+    msg: string,
+    type: 'success' | 'error' | 'info' = 'info',
+    onRetry?: () => void
+  ) => {
+    setToastData({ type, message: msg, onRetry });
+    if (type !== 'error') {
+      setTimeout(() => setToastData(null), 4000);
+    }
   };
 
   // Add new hotspot
@@ -413,9 +423,13 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
         coverHotspots: hotspots
       });
       onEventUpdated(updated);
-      showToast('Convite interativo salvo com sucesso na nuvem!');
+      showToast('Alterações salvas com sucesso', 'success');
     } catch (err: any) {
-      showToast('Erro ao salvar: ' + (err.message || 'Verifique sua conexão'));
+      showToast(
+        err.message || 'Não foi possível salvar as alterações no banco de dados. Tente novamente.',
+        'error',
+        () => handleSaveInvite()
+      );
     } finally {
       setIsSaving(false);
     }
@@ -591,13 +605,42 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
         </div>
 
         {/* Status Toast */}
-        {toastMessage && (
-          <div className="bg-teal-900 text-white text-xs font-semibold px-4 py-2 flex items-center justify-between shadow-inner">
+        {toastData && (
+          <div
+            className={`text-white text-xs font-semibold px-4 py-2.5 flex items-center justify-between shadow-inner transition ${
+              toastData.type === 'success'
+                ? 'bg-emerald-700'
+                : toastData.type === 'error'
+                ? 'bg-rose-700'
+                : 'bg-teal-900'
+            }`}
+          >
             <div className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-teal-400" />
-              <span>{toastMessage}</span>
+              {toastData.type === 'error' ? (
+                <AlertCircle size={16} className="text-rose-200 shrink-0" />
+              ) : (
+                <CheckCircle2 size={16} className="text-emerald-300 shrink-0" />
+              )}
+              <span>{toastData.message}</span>
             </div>
-            <button onClick={() => setToastMessage(null)} className="text-teal-200 hover:text-white">✕</button>
+            <div className="flex items-center gap-2">
+              {toastData.onRetry && (
+                <button
+                  type="button"
+                  onClick={toastData.onRetry}
+                  className="px-2.5 py-1 bg-white text-rose-800 rounded font-bold text-xs hover:bg-rose-50 cursor-pointer shadow-xs transition"
+                >
+                  Tentar novamente
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setToastData(null)}
+                className="text-white/80 hover:text-white px-1 font-bold"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )}
 

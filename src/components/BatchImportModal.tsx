@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, ArrowRight, Sparkles } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { CondoEvent, Invitation } from '../types';
 import { batchImportInvitations } from '../lib/api';
 import { formatPhone } from '../lib/utils';
@@ -32,6 +32,7 @@ export const BatchImportModal: React.FC<Props> = ({
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [step, setStep] = useState<'input' | 'preview'>('input');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -125,11 +126,14 @@ Condomínio Park Avenue;Juliana Mendes;;11966554433`;
   const handleConfirmImport = async () => {
     try {
       setImporting(true);
+      setErrorMessage(null);
       const res = await batchImportInvitations(event.id, parsedRows);
       onSuccess(res.importedCount);
       onClose();
     } catch (err: any) {
-      alert(err.message || 'Erro ao importar convidados');
+      setErrorMessage(
+        err.message || 'Não foi possível salvar os convidados no banco de dados. Tente novamente.'
+      );
     } finally {
       setImporting(false);
     }
@@ -153,10 +157,25 @@ Condomínio Park Avenue;Juliana Mendes;;11966554433`;
           </div>
           <h2 className="text-xl font-bold text-slate-900">Importação em Massa de Convidados</h2>
         </div>
-        <p className="text-slate-500 text-xs mb-5">
+        <p className="text-slate-500 text-xs mb-3">
           Importe dezenas de condomínios de uma vez. O sistema gerará automaticamente links
           exclusivos e QR Codes para cada um.
         </p>
+
+        {errorMessage && (
+          <div className="mb-4 bg-rose-50 border border-rose-300 text-rose-900 px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={18} className="text-rose-600 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              onClick={handleConfirmImport}
+              className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition ml-3 shrink-0"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {step === 'input' ? (
           <div className="flex-1 overflow-y-auto space-y-4">

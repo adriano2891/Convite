@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, User, Phone, FileText, AlertTriangle, Check, Copy } from 'lucide-react';
+import { X, Building2, User, Phone, FileText, AlertTriangle, Check, Copy, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Invitation, CondoEvent } from '../types';
 import { checkDuplicate, createInvitation, updateInvitation } from '../lib/api';
 import { formatPhone, buildInvitationUrl, openWhatsApp, getWhatsAppMessage } from '../lib/utils';
@@ -31,6 +31,8 @@ export const GuestModal: React.FC<Props> = ({
   const [duplicateWarning, setDuplicateWarning] = useState<Invitation | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (invitationToEdit) {
@@ -87,17 +89,21 @@ export const GuestModal: React.FC<Props> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!condoName.trim() || !managerName.trim() || !whatsapp.trim()) {
       alert('Por favor, preencha os campos obrigatórios.');
       return;
     }
 
+    setSaveSuccessMessage(null);
+    setSaveErrorMessage(null);
+
     try {
       setSubmitting(true);
+      let result: Invitation;
       if (invitationToEdit) {
-        const updated = await updateInvitation(invitationToEdit.id, {
+        result = await updateInvitation(invitationToEdit.id, {
           condoName: condoName.trim(),
           managerName: managerName.trim(),
           janitorName: janitorName.trim(),
@@ -106,9 +112,8 @@ export const GuestModal: React.FC<Props> = ({
           customShareImageUrl: customShareImageUrl.trim() || undefined,
           status
         });
-        onSuccess(updated);
       } else {
-        const created = await createInvitation(event.id, {
+        result = await createInvitation(event.id, {
           condoName: condoName.trim(),
           managerName: managerName.trim(),
           janitorName: janitorName.trim(),
@@ -116,11 +121,15 @@ export const GuestModal: React.FC<Props> = ({
           internalNotes: internalNotes.trim(),
           customShareImageUrl: customShareImageUrl.trim() || undefined
         });
-        onSuccess(created);
       }
-      onClose();
+      onSuccess(result);
+      setSaveSuccessMessage('Alterações salvas com sucesso');
+      setTimeout(() => {
+        setSaveSuccessMessage(null);
+        onClose();
+      }, 1200);
     } catch (err: any) {
-      alert(err.message || 'Erro ao salvar convite');
+      setSaveErrorMessage(err.message || 'Não foi possível salvar as alterações no banco de dados. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -158,6 +167,32 @@ export const GuestModal: React.FC<Props> = ({
             ? `Código do Convite: ${invitationToEdit.code}`
             : 'Cadastre o condomínio e gere o link exclusivo de confirmação'}
         </p>
+
+        {/* Visual Database Save Feedback */}
+        {saveSuccessMessage && (
+          <div className="mb-4 bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+              <span>{saveSuccessMessage}</span>
+            </div>
+            <button onClick={() => setSaveSuccessMessage(null)} className="text-emerald-700 hover:text-emerald-900 font-bold ml-2">✕</button>
+          </div>
+        )}
+
+        {saveErrorMessage && (
+          <div className="mb-4 bg-rose-50 border border-rose-300 text-rose-900 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={18} className="text-rose-600 shrink-0" />
+              <span>{saveErrorMessage}</span>
+            </div>
+            <button
+              onClick={() => handleSubmit()}
+              className="px-3 py-1 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-bold transition shrink-0 ml-2"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {/* Duplicate Warning */}
         {duplicateWarning && (

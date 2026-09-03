@@ -38,7 +38,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  PhoneCall
+  PhoneCall,
+  Database
 } from 'lucide-react';
 import { Invitation, CondoEvent, NotificationItem, DashboardMetrics } from '../types';
 import {
@@ -139,6 +140,27 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
     message: string;
     type: string;
   } | null>(null);
+
+  // Global Database Save Confirmation Toast
+  const [saveToast, setSaveToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    onRetry?: () => void;
+  } | null>(null);
+
+  const triggerSaveSuccess = (message = 'Alterações salvas com sucesso') => {
+    setSaveToast({ type: 'success', message });
+    setTimeout(() => {
+      setSaveToast((curr) => (curr?.type === 'success' ? null : curr));
+    }, 4000);
+  };
+
+  const triggerSaveError = (
+    message = 'Não foi possível salvar no banco de dados. Tente novamente.',
+    onRetry?: () => void
+  ) => {
+    setSaveToast({ type: 'error', message, onRetry });
+  };
 
   // Load initial data
   const loadAllData = async () => {
@@ -357,7 +379,7 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
   // Row actions
   const handleDelete = async (id: string) => {
     const confirmDelete = window.confirm(
-      'Tem certeza de que deseja excluir permanentemente este convite?'
+      'Tem certeza de que deseja excluir permanentemente este convite do banco de dados?'
     );
     if (!confirmDelete) return;
 
@@ -367,8 +389,12 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
       if (selectedInvitation?.id === id) {
         setIsDrawerOpen(false);
       }
-    } catch (err) {
-      alert('Erro ao excluir convite');
+      triggerSaveSuccess('Convite excluído do banco de dados com sucesso!');
+    } catch (err: any) {
+      triggerSaveError(
+        err.message || 'Não foi possível excluir o convite do banco de dados.',
+        () => handleDelete(id)
+      );
     }
   };
 
@@ -381,8 +407,12 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
         confirmedAt: new Date().toISOString()
       });
       setInvitations((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
-    } catch (err) {
-      alert('Erro ao confirmar presença');
+      triggerSaveSuccess('Presença confirmada e salva no banco de dados com sucesso!');
+    } catch (err: any) {
+      triggerSaveError(
+        err.message || 'Não foi possível salvar a confirmação no banco de dados.',
+        () => handleManualConfirm(inv)
+      );
     }
   };
 
@@ -395,8 +425,12 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
         declinedAt: new Date().toISOString()
       });
       setInvitations((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
-    } catch (err) {
-      alert('Erro ao atualizar status');
+      triggerSaveSuccess('Status atualizado e salvo no banco de dados com sucesso!');
+    } catch (err: any) {
+      triggerSaveError(
+        err.message || 'Não foi possível salvar as alterações no banco de dados.',
+        () => handleManualDecline(inv)
+      );
     }
   };
 
@@ -556,6 +590,15 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
 
           {/* Right Header Tools */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Database Persistence Indicator */}
+            <div
+              className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold"
+              title="Todas as alterações são salvas permanentemente no banco de dados do servidor"
+            >
+              <Database size={13} className="text-emerald-600 shrink-0" />
+              <span className="hidden sm:inline">Banco Ativo</span>
+            </div>
+
             {/* Realtime Live Indicator */}
             <div
               className="flex items-center gap-1.5 bg-slate-100 px-2 sm:px-2.5 py-1 rounded-full border border-slate-200 text-[10px] sm:text-[11px]"
@@ -708,6 +751,44 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
           </button>
         </div>
       </header>
+
+      {/* Global Database Save Toast Banner */}
+      {saveToast && (
+        <div
+          className={`w-full py-2.5 px-4 text-xs font-semibold flex items-center justify-between shadow-md transition z-20 sticky top-16 ${
+            saveToast.type === 'success'
+              ? 'bg-emerald-700 text-white'
+              : 'bg-rose-700 text-white'
+          }`}
+        >
+          <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {saveToast.type === 'success' ? (
+                <CheckCircle2 size={18} className="text-emerald-300 shrink-0" />
+              ) : (
+                <AlertCircle size={18} className="text-rose-200 shrink-0" />
+              )}
+              <span>{saveToast.message}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {saveToast.onRetry && (
+                <button
+                  onClick={saveToast.onRetry}
+                  className="px-2.5 py-1 bg-white text-rose-800 rounded font-bold text-xs hover:bg-rose-50 cursor-pointer shadow-xs transition"
+                >
+                  Tentar novamente
+                </button>
+              )}
+              <button
+                onClick={() => setSaveToast(null)}
+                className="text-white/80 hover:text-white px-1 font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Slide-Over Navigation Drawer */}
       {isMobileMenuOpen && (
@@ -1865,6 +1946,7 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
           } else {
             setInvitations((prev) => [inv, ...prev]);
           }
+          triggerSaveSuccess('Convite salvo com sucesso no banco de dados!');
         }}
       />
 
@@ -1889,6 +1971,7 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
         onUpdate={(updated) => {
           setSelectedInvitation(updated);
           setInvitations((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+          triggerSaveSuccess('Convite atualizado no banco de dados!');
         }}
       />
 
@@ -1899,6 +1982,7 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
         existingInvitations={invitations}
         onSuccess={() => {
           fetchInvitations(activeEvent.id).then(setInvitations);
+          triggerSaveSuccess('Convites importados e salvos no banco de dados com sucesso!');
         }}
       />
 
@@ -1935,6 +2019,7 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
         onEventUpdated={(updated) => {
           setActiveEvent(updated);
           setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+          triggerSaveSuccess('Alterações salvas com sucesso');
         }}
       />
 
@@ -1947,6 +2032,7 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
         onEventsUpdated={(updatedEvents, updatedActive) => {
           setEvents(updatedEvents);
           if (updatedActive) setActiveEvent(updatedActive);
+          triggerSaveSuccess('Alterações salvas com sucesso');
         }}
       />
     </div>

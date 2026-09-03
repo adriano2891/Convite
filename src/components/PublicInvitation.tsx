@@ -69,13 +69,6 @@ export const PublicInvitation: React.FC<Props> = ({
   const [showSuccessCard, setShowSuccessCard] = useState(false);
   const [showDeclinedCard, setShowDeclinedCard] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isSavedLocal, setIsSavedLocal] = useState(() => {
-    try {
-      return localStorage.getItem('ativa_saved_invite') === 'true';
-    } catch {
-      return false;
-    }
-  });
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
 
@@ -184,17 +177,6 @@ export const PublicInvitation: React.FC<Props> = ({
   const showToast = (msg: string) => {
     setToastNotice(msg);
     setTimeout(() => setToastNotice(null), 3500);
-  };
-
-  const handleSaveInviteLocal = () => {
-    try {
-      const next = !isSavedLocal;
-      setIsSavedLocal(next);
-      localStorage.setItem('ativa_saved_invite', next ? 'true' : 'false');
-      showToast(next ? 'Convite salvo nos favoritos com sucesso!' : 'Convite removido dos favoritos.');
-    } catch {
-      showToast('Convite salvo temporariamente neste navegador.');
-    }
   };
 
   const handleDownloadPdf = async () => {

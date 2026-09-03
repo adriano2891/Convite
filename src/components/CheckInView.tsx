@@ -10,7 +10,8 @@ import {
   Clock,
   RotateCcw,
   Sparkles,
-  Camera
+  Camera,
+  AlertCircle
 } from 'lucide-react';
 import { Invitation, CondoEvent } from '../types';
 import { formatDateTimeBR, formatDateBR } from '../lib/utils';
@@ -32,6 +33,8 @@ export const CheckInView: React.FC<Props> = ({
   const [manualCode, setManualCode] = useState('');
   const [scanning, setScanning] = useState(false);
   const [lastCheckinName, setLastCheckinName] = useState<string | null>(null);
+  const [checkinStatusMessage, setCheckinStatusMessage] = useState<string | null>(null);
+  const [checkinErrorMessage, setCheckinErrorMessage] = useState<string | null>(null);
 
   // Metrics
   const confirmedList = useMemo(
@@ -77,12 +80,22 @@ export const CheckInView: React.FC<Props> = ({
     try {
       const updated = await toggleCheckin(inv.id);
       onUpdateInvitation(updated);
+      setCheckinErrorMessage(null);
+      setCheckinStatusMessage(
+        updated.status === 'checked_in'
+          ? `Check-in de ${updated.condoName} (${updated.managerName}) salvo no banco de dados!`
+          : `Check-in de ${updated.condoName} cancelado e salvo no banco de dados!`
+      );
+      setTimeout(() => setCheckinStatusMessage(null), 4000);
       if (updated.status === 'checked_in') {
         setLastCheckinName(`${updated.condoName} (${updated.managerName})`);
         setTimeout(() => setLastCheckinName(null), 4000);
       }
-    } catch (err) {
-      alert('Erro ao alterar status de check-in');
+    } catch (err: any) {
+      setCheckinStatusMessage(null);
+      setCheckinErrorMessage(
+        err.message || 'Não foi possível gravar o check-in no banco de dados. Tente novamente.'
+      );
     }
   };
 
@@ -102,6 +115,27 @@ export const CheckInView: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
+      {/* Feedback Banners for Database Persistence */}
+      {checkinStatusMessage && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+            <span>{checkinStatusMessage}</span>
+          </div>
+          <button onClick={() => setCheckinStatusMessage(null)} className="text-emerald-700 hover:text-emerald-900 font-bold ml-2">✕</button>
+        </div>
+      )}
+
+      {checkinErrorMessage && (
+        <div className="bg-rose-50 border border-rose-300 text-rose-900 px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} className="text-rose-600 shrink-0" />
+            <span>{checkinErrorMessage}</span>
+          </div>
+          <button onClick={() => setCheckinErrorMessage(null)} className="text-rose-700 hover:text-rose-900 font-bold ml-2">✕</button>
+        </div>
+      )}
+
       {/* Top Banner with Large Live Counters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">

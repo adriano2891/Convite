@@ -11,6 +11,7 @@ import {
   Lock,
   Plus,
   CheckCircle2,
+  AlertCircle,
   Trash2,
   Save,
   HelpCircle,
@@ -96,6 +97,8 @@ export const EventSettingsModal: React.FC<Props> = ({
   const [newTime, setNewTime] = useState('19:00');
 
   const [saving, setSaving] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,8 +136,10 @@ export const EventSettingsModal: React.FC<Props> = ({
 
   if (!isOpen) return null;
 
-  const handleSaveDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveDetails = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSaveSuccessMessage(null);
+    setSaveErrorMessage(null);
     try {
       setSaving(true);
       const updated = await updateEvent(currentEvent.id, {
@@ -155,9 +160,13 @@ export const EventSettingsModal: React.FC<Props> = ({
 
       const updatedList = allEvents.map((ev) => (ev.id === updated.id ? updated : ev));
       onEventsUpdated(updatedList, updated);
-      onClose();
+      setSaveSuccessMessage('Alterações salvas com sucesso');
+      setTimeout(() => {
+        setSaveSuccessMessage(null);
+        onClose();
+      }, 1500);
     } catch (err: any) {
-      alert(err.message || 'Erro ao atualizar configurações.');
+      setSaveErrorMessage(err.message || 'Não foi possível salvar as alterações no banco de dados. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -242,6 +251,32 @@ export const EventSettingsModal: React.FC<Props> = ({
         <p className="text-slate-500 text-xs mb-4">
           Personalize informações do convite público, limites de vagas, modelos de WhatsApp e segurança.
         </p>
+
+        {/* Visual Database Save Feedback */}
+        {saveSuccessMessage && (
+          <div className="mb-4 bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+              <span>{saveSuccessMessage}</span>
+            </div>
+            <button onClick={() => setSaveSuccessMessage(null)} className="text-emerald-700 hover:text-emerald-900 font-bold ml-2">✕</button>
+          </div>
+        )}
+
+        {saveErrorMessage && (
+          <div className="mb-4 bg-rose-50 border border-rose-300 text-rose-900 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={18} className="text-rose-600 shrink-0" />
+              <span>{saveErrorMessage}</span>
+            </div>
+            <button
+              onClick={() => handleSaveDetails()}
+              className="px-3 py-1 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-bold transition shrink-0 ml-2"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {/* Tab Header */}
         <div className="flex border-b border-slate-200 gap-2 mb-4 overflow-x-auto text-xs font-bold">

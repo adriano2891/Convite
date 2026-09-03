@@ -7,12 +7,21 @@ import { CondoEvent, Invitation, NotificationItem, HistoryEntry } from './src/ty
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Ensure all /api responses are never cached by browsers or proxies
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // Data Directory & Persistence
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
+const DB_BACKUP_FILE = path.join(DATA_DIR, 'database.backup.json');
 
 interface DatabaseSchema {
   adminPin: string;
@@ -344,13 +353,42 @@ function loadDatabase(): DatabaseSchema {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       db = JSON.parse(raw);
-    } else {
-      db = getInitialData();
-      saveDatabase();
+      if (db && Array.isArray(db.events) && db.events.length > 0) {
+        console.log(`[DB] Database loaded successfully from ${DB_FILE}. Found ${db.events.length} event(s).`);
+        return db;
+      }
+    }
+    // If DB_FILE is missing or empty, check DB_BACKUP_FILE
+    if (fs.existsSync(DB_BACKUP_FILE)) {
+      const rawBackup = fs.readFileSync(DB_BACKUP_FILE, 'utf-8');
+      const backupDb = JSON.parse(rawBackup);
+      if (backupDb && Array.isArray(backupDb.events) && backupDb.events.length > 0) {
+        db = backupDb;
+        saveDatabase();
+        console.log(`[DB] Database restored successfully from backup.`);
+        return db;
+      }
     }
   } catch (err) {
-    console.error('Error loading database, resetting to default:', err);
-    db = getInitialData();
+    console.error('CRITICAL: Error loading primary database, attempting backup restoration:', err);
+    if (fs.existsSync(DB_BACKUP_FILE)) {
+      try {
+        const rawBackup = fs.readFileSync(DB_BACKUP_FILE, 'utf-8');
+        db = JSON.parse(rawBackup);
+        console.log('[DB] Recovered database state from backup file.');
+        return db;
+      } catch (backupErr) {
+        console.error('CRITICAL: Backup file is also corrupt:', backupErr);
+      }
+    }
+  }
+
+  console.log('[DB] Initializing default database schema.');
+  db = getInitialData();
+  try {
+    saveDatabase();
+  } catch (err) {
+    console.error('Failed to write initial database:', err);
   }
   return db;
 }
@@ -360,9 +398,18 @@ function saveDatabase() {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    const serialized = JSON.stringify(db, null, 2);
+    // Write atomically via temporary file
+    const tempFile = path.join(DATA_DIR, `database.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 6)}`);
+    fs.writeFileSync(tempFile, serialized, 'utf-8');
+    fs.renameSync(tempFile, DB_FILE);
+
+    // Keep an immediate backup copy
+    fs.copyFileSync(DB_FILE, DB_BACKUP_FILE);
+    return true;
   } catch (err) {
-    console.error('Failed to save database:', err);
+    console.error('CRITICAL: Failed to save database to disk:', err);
+    throw new Error('Falha ao gravar alterações no banco de dados');
   }
 }
 
@@ -391,6 +438,14 @@ function broadcastSSE(type: string, data: any) {
 // -------------------------------------------------------------
 // API ROUTES
 // -------------------------------------------------------------
+
+// Enforce strict no-cache on all API responses so clients always receive the latest database state
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // SSE stream for real-time live updates
 app.get('/api/events/live', (req, res) => {
