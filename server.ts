@@ -81,16 +81,16 @@ function getInitialData(): DatabaseSchema {
 
   const event1: CondoEvent = {
     id: 'evt-2026-seguranca',
-    title: 'Convenção Nacional Ativa 2026',
+    title: 'Treinamento Intelbras',
     date: '2026-09-21',
     time: '14:00',
     location: 'Centro de Convenções Ativa',
     address: 'Av. Paulista, 1000 - Bela Vista, SP',
     bannerUrl: '/covers/default-cover.png',
     logoUrl: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=300&q=80',
-    presentationText: 'Bem-vindo à Convenção Nacional Ativa. Confirme sua presença abaixo.',
-    shareTitle: 'Convenção Nacional Ativa 2026',
-    shareDescription: 'Convite oficial para a Convenção Nacional Ativa 2026. Confirme sua presença.',
+    presentationText: 'Bem-vindo ao Treinamento Intelbras para Síndicos & Zeladores. Confirme sua presença abaixo.',
+    shareTitle: 'Treinamento Intelbras | Síndicos & Zeladores',
+    shareDescription: 'Convite Especial - Treinamento Intelbras + Grupo Ativa para Síndicos e Zeladores. Confirme sua presença.',
     requireJanitor: true,
     maxParticipants: 50,
     confirmationDeadline: '2026-09-12',
@@ -103,10 +103,10 @@ function getInitialData(): DatabaseSchema {
         actionType: 'confirm_rsvp',
         targetUrl: '#formulario',
         openInNewTab: false,
-        x: 7.2,
-        y: 61.7,
-        width: 42,
-        height: 7.5
+        x: 6.0,
+        y: 55.1,
+        width: 42.3,
+        height: 6.4
       },
       {
         id: 'hs-2',
@@ -114,10 +114,10 @@ function getInitialData(): DatabaseSchema {
         actionType: 'google_maps',
         targetUrl: 'https://maps.google.com/?q=Av.+Paulista,+1000+-+Bela+Vista,+SP',
         openInNewTab: true,
-        x: 50.6,
-        y: 61.8,
-        width: 44.1,
-        height: 7.8
+        x: 51.8,
+        y: 55.1,
+        width: 42.3,
+        height: 6.4
       }
     ],
     whatsappTemplates: { ...defaultTemplates },

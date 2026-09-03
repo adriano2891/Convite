@@ -257,13 +257,13 @@ export const PublicInvitation: React.FC<Props> = ({
               // Fallback to default event data
               setEvent({
                 id: 'evt-2026-seguranca',
-                title: 'Convenção Nacional Ativa 2026',
+                title: 'Treinamento Intelbras',
                 date: '2026-09-21',
                 time: '14:00',
                 location: 'Centro de Convenções Ativa',
                 address: 'Av. Paulista, 1000 - Bela Vista, SP',
                 bannerUrl: '/covers/default-cover.png',
-                presentationText: 'Bem-vindo à Convenção Nacional Ativa. Confirme sua presença abaixo.',
+                presentationText: 'Bem-vindo ao Treinamento Intelbras para Síndicos & Zeladores. Confirme sua presença abaixo.',
                 requireJanitor: true,
                 maxParticipants: 50,
                 confirmationDeadline: '2026-09-12',
@@ -276,10 +276,10 @@ export const PublicInvitation: React.FC<Props> = ({
                     actionType: 'confirm_rsvp',
                     targetUrl: '#formulario',
                     openInNewTab: false,
-                    x: 7.2,
-                    y: 61.7,
-                    width: 42,
-                    height: 7.5
+                    x: 6.0,
+                    y: 55.1,
+                    width: 42.3,
+                    height: 6.4
                   },
                   {
                     id: 'hs-2',
@@ -287,10 +287,10 @@ export const PublicInvitation: React.FC<Props> = ({
                     actionType: 'google_maps',
                     targetUrl: 'https://maps.google.com/?q=Av.+Paulista,+1000+-+Bela+Vista,+SP',
                     openInNewTab: true,
-                    x: 50.6,
-                    y: 61.8,
-                    width: 44.1,
-                    height: 7.8
+                    x: 51.8,
+                    y: 55.1,
+                    width: 42.3,
+                    height: 6.4
                   }
                 ],
                 createdAt: '2026-08-28T02:43:42.858Z',
