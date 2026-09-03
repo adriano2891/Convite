@@ -64,7 +64,7 @@ import { BatchImportModal } from './BatchImportModal';
 import { QrCodeModal } from './QrCodeModal';
 import { WhatsAppModal } from './WhatsAppModal';
 import { GenericInviteModal } from './GenericInviteModal';
-import { CoverCustomizerModal } from './CoverCustomizerModal';
+import { InteractiveCoverEditorModal } from './InteractiveCoverEditorModal';
 import { CheckInView } from './CheckInView';
 import { ReportsView } from './ReportsView';
 import { EventSettingsModal } from './EventSettingsModal';
@@ -603,14 +603,14 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
 
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-2">
-              {/* Trocar Capa Button */}
+              {/* Capa Interativa & Hiperlinks Button */}
               <button
                 onClick={() => setIsCoverModalOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-300 text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                title="Trocar Capa do Convite"
+                className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Editar Capa Interativa, Hiperlinks Clicáveis e Exportar PDF"
               >
-                <ImageIcon size={15} className="text-teal-700" />
-                <span>Trocar Capa</span>
+                <Sparkles size={15} className="text-teal-700" />
+                <span>Capa Interativa &amp; Hiperlinks</span>
               </button>
 
               {/* Social Preview Button */}
@@ -826,8 +826,8 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
                 }}
                 className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-teal-800 hover:bg-teal-50 font-semibold transition cursor-pointer"
               >
-                <ImageIcon size={18} />
-                <span>Trocar Capa do Convite</span>
+                <Sparkles size={18} className="text-teal-700" />
+                <span>Capa Interativa &amp; Hiperlinks</span>
               </button>
 
               <button
@@ -1928,11 +1928,11 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
         }}
       />
 
-      <CoverCustomizerModal
+      <InteractiveCoverEditorModal
         isOpen={isCoverModalOpen}
         onClose={() => setIsCoverModalOpen(false)}
         event={activeEvent}
-        onCoverUpdated={(updated) => {
+        onEventUpdated={(updated) => {
           setActiveEvent(updated);
           setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
         }}

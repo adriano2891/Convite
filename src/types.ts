@@ -37,6 +37,27 @@ export interface WhatsAppTemplates {
   thankYou: string;
 }
 
+export type HotspotActionType =
+  | 'confirm_rsvp'
+  | 'open_form'
+  | 'google_maps'
+  | 'whatsapp'
+  | 'custom_url'
+  | 'register';
+
+export interface CoverHotspot {
+  id: string;
+  name: string;
+  actionType: HotspotActionType;
+  targetUrl: string;
+  openInNewTab: boolean;
+  // Proportional coordinates in percentages (0% to 100%)
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface CondoEvent {
   id: string;
   title: string;
@@ -50,6 +71,7 @@ export interface CondoEvent {
   shareImageUrl?: string;
   shareTitle?: string;
   shareDescription?: string;
+  coverHotspots?: CoverHotspot[];
   requireJanitor: boolean;
   maxParticipants: number;
   confirmationDeadline: string; // ISO or YYYY-MM-DDTHH:mm

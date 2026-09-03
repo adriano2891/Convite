@@ -19,11 +19,15 @@ import {
   Layers,
   CheckCircle2,
   Building2,
-  Trash2
+  Trash2,
+  FileText,
+  Download,
+  Send
 } from 'lucide-react';
 import { CondoEvent, Invitation } from '../types';
 import { updateEvent } from '../lib/api';
 import { formatDateBR, buildInvitationUrl, getWhatsAppMessage } from '../lib/utils';
+import { getPdfFileName, generateInteractivePdf } from '../lib/interactivePdf';
 
 interface Props {
   event: CondoEvent;
@@ -94,7 +98,9 @@ export const SocialPreviewSection: React.FC<Props> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
-  const [previewPlatform, setPreviewPlatform] = useState<'whatsapp' | 'facebook' | 'linkedin'>('whatsapp');
+  const [previewPlatform, setPreviewPlatform] = useState<'whatsapp' | 'whatsapp_doc' | 'facebook'>('whatsapp');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
   
   // Test guest simulation selector
   const [selectedGuestId, setSelectedGuestId] = useState<string>(
@@ -102,6 +108,27 @@ export const SocialPreviewSection: React.FC<Props> = ({
   );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDownloadSamplePdf = async () => {
+    setIsExportingPdf(true);
+    setExportFeedback('Gerando arquivo PDF...');
+    try {
+      const selectedGuest = invitations.find((i) => i.id === selectedGuestId);
+      const res = await generateInteractivePdf({
+        event,
+        hotspots: event.coverHotspots || [],
+        invitationCode: selectedGuest?.code || 'geral',
+        autoDownload: true
+      });
+      setExportFeedback(`✓ Baixado: ${res.fileName}`);
+      setTimeout(() => setExportFeedback(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setExportFeedback('Erro ao gerar PDF: ' + (err.message || 'Erro'));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Synchronize when active event changes
   useEffect(() => {
@@ -487,7 +514,7 @@ export const SocialPreviewSection: React.FC<Props> = ({
               </div>
 
               {/* Platform Switcher */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+              <div className="flex flex-wrap items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setPreviewPlatform('whatsapp')}
@@ -497,7 +524,18 @@ export const SocialPreviewSection: React.FC<Props> = ({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  WhatsApp
+                  WhatsApp (Link)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPlatform('whatsapp_doc')}
+                  className={`px-2 py-1 rounded text-[10px] font-bold transition ${
+                    previewPlatform === 'whatsapp_doc'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-700 hover:text-slate-900 font-semibold'
+                  }`}
+                >
+                  WhatsApp (PDF com Capa)
                 </button>
                 <button
                   type="button"
@@ -532,7 +570,7 @@ export const SocialPreviewSection: React.FC<Props> = ({
               </select>
             </div>
 
-            {/* WhatsApp Simulator View */}
+            {/* Simulator Views */}
             {previewPlatform === 'whatsapp' ? (
               <div className="bg-[#e5ddd5] rounded-2xl p-4 border border-slate-300 shadow-inner space-y-3 font-sans">
                 {/* Chat Message Bubble */}
@@ -571,7 +609,77 @@ export const SocialPreviewSection: React.FC<Props> = ({
                 </div>
 
                 <div className="text-[10px] text-slate-600 text-center font-medium">
-                  Prévia fiel do balão de mensagem e thumbnail gerada no WhatsApp
+                  Prévia fiel do balão de mensagem e miniatura gerada ao enviar o Link no WhatsApp
+                </div>
+              </div>
+            ) : previewPlatform === 'whatsapp_doc' ? (
+              /* WhatsApp Document PDF Preview View - matching user's Image 2 */
+              <div className="bg-[#0b141a] rounded-2xl p-4 border border-slate-800 shadow-2xl space-y-3 font-sans">
+                <div className="bg-[#202c33] rounded-xl overflow-hidden border border-slate-700/70 shadow-lg text-white">
+                  {/* Image Cover Thumbnail */}
+                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-950">
+                    <img
+                      src={activePreviewImage}
+                      alt="Capa do Convite no WhatsApp"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/75 backdrop-blur-xs text-[9px] font-extrabold text-emerald-400 uppercase tracking-wide">
+                      Miniatura da Capa (/Thumb)
+                    </div>
+                  </div>
+
+                  {/* PDF Document File Info */}
+                  <div className="p-3 bg-[#111b21] flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex flex-col items-center justify-center shrink-0 shadow-xs font-black text-[9px]">
+                      <FileText size={18} className="text-white" />
+                      <span className="leading-none text-[8px] mt-0.5">PDF</span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-100 truncate">
+                        {getPdfFileName(event.title)}
+                      </div>
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
+                        <span>1 página</span>
+                        <span>•</span>
+                        <span>PDF</span>
+                        <span>•</span>
+                        <span className="text-emerald-400 font-semibold">169 KB</span>
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-slate-500 self-end pb-0.5 flex items-center gap-0.5">
+                      <span>12:28</span>
+                      <span className="text-sky-400 font-bold">✓✓</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/40 text-[11px] text-emerald-300 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5 text-emerald-200">
+                    <CheckCircle2 size={13} className="text-emerald-400" />
+                    Envio como Documento com Miniatura
+                  </p>
+                  <p className="text-slate-300 text-[10px] leading-relaxed">
+                    O PDF gerado tem metadados de miniatura e tamanho otimizado (~169 KB). Ao ser compartilhado como documento no WhatsApp, exibe a capa com miniatura nítida e mantém todos os botões clicáveis.
+                  </p>
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={handleDownloadSamplePdf}
+                    disabled={isExportingPdf}
+                    className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Download size={13} />
+                    <span>{isExportingPdf ? 'Gerando...' : 'Baixar PDF Teste com Miniatura'}</span>
+                  </button>
+                  {exportFeedback && (
+                    <p className="text-[11px] text-emerald-400 font-semibold text-center mt-1.5">
+                      {exportFeedback}
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (

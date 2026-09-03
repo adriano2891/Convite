@@ -67,6 +67,31 @@ function getInitialData(): DatabaseSchema {
     confirmationDeadline: deadlineDate.toISOString().split('T')[0],
     waitingListEnabled: true,
     status: 'active',
+    coverHotspots: [
+      {
+        id: 'hs-rsvp-1',
+        name: 'Confirmar Presença',
+        actionType: 'confirm_rsvp',
+        targetUrl: '#formulario',
+        openInNewTab: false,
+        x: 15,
+        y: 73,
+        width: 70,
+        height: 14
+      },
+      {
+        id: 'hs-maps-2',
+        name: 'Como Chegar (Maps)',
+        actionType: 'google_maps',
+        targetUrl:
+          'https://www.google.com/maps/search/?api=1&query=R.+Bela+Cintra%2C+299+-+Cerqueira+C%C3%A9sar%2C+S%C3%A3o+Paulo+-+SP',
+        openInNewTab: true,
+        x: 15,
+        y: 88,
+        width: 70,
+        height: 10
+      }
+    ],
     whatsappTemplates: { ...defaultTemplates },
     createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     updatedAt: new Date().toISOString()
@@ -638,6 +663,9 @@ app.post('/api/events', (req, res) => {
       'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
     logoUrl: logoUrl || '',
     presentationText: presentationText || 'Preencha os dados abaixo para confirmar sua presença no evento.',
+    shareTitle: req.body.shareTitle || title,
+    shareDescription: req.body.shareDescription || 'Convite especial para Síndicos e Zeladores. Confirme sua presença.',
+    coverHotspots: req.body.coverHotspots || [],
     requireJanitor: !!requireJanitor,
     maxParticipants: Number(maxParticipants) || 50,
     confirmationDeadline: confirmationDeadline || date,

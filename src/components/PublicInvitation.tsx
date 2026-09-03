@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   Clock,
@@ -16,8 +16,12 @@ import {
   Copy,
   Check,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
-  QrCode as QrIcon
+  QrCode as QrIcon,
+  MessageCircle,
+  Bookmark,
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
@@ -25,6 +29,10 @@ import { Invitation, CondoEvent, AttendeeRole } from '../types';
 import { getInvitationByCode, submitRsvp, getActiveEventPublic, registerPublicInvitation } from '../lib/api';
 import { formatPhone, formatDateBR, downloadCalendarFile, buildInvitationUrl } from '../lib/utils';
 import { AtivaLogo } from './AtivaLogo';
+import { InteractiveCoverViewer } from './InteractiveCoverViewer';
+import { FullscreenRsvpModal } from './FullscreenRsvpModal';
+import { generateInteractivePdf } from '../lib/interactivePdf';
+import { fireCelebrationConfetti } from '../lib/confetti';
 
 interface Props {
   code?: string;
@@ -61,6 +69,165 @@ export const PublicInvitation: React.FC<Props> = ({
   const [showSuccessCard, setShowSuccessCard] = useState(false);
   const [showDeclinedCard, setShowDeclinedCard] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isSavedLocal, setIsSavedLocal] = useState(() => {
+    try {
+      return localStorage.getItem('ativa_saved_invite') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
+
+  // Helper to detect if URL requested immediate form open (e.g. from PDF link with ?confirmar=1, ?rsvp=1, #formulario)
+  const shouldInitialAutoOpen = () => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    const hash = (window.location.hash || '').toLowerCase();
+    return (
+      params.get('confirmar') === '1' ||
+      params.get('confirmar') === 'true' ||
+      params.get('rsvp') === '1' ||
+      params.get('openForm') === 'true' ||
+      params.get('open') === 'form' ||
+      hash.includes('formulario') ||
+      hash.includes('confirmar') ||
+      hash.includes('rsvp')
+    );
+  };
+
+  // Fullscreen Form State
+  const [isFormFullscreenOpen, setIsFormFullscreenOpen] = useState(shouldInitialAutoOpen);
+  const savedScrollPosRef = useRef<number>(0);
+
+  const openFullscreenForm = () => {
+    // Save exact scroll position before opening fullscreen
+    savedScrollPosRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    setIsFormFullscreenOpen(true);
+  };
+
+  const closeFullscreenForm = () => {
+    setIsFormFullscreenOpen(false);
+
+    // Clean up query param/hash without triggering page refresh
+    if (typeof window !== 'undefined') {
+      try {
+        const url = new URL(window.location.href);
+        let changed = false;
+        if (url.searchParams.has('confirmar')) {
+          url.searchParams.delete('confirmar');
+          changed = true;
+        }
+        if (url.searchParams.has('rsvp')) {
+          url.searchParams.delete('rsvp');
+          changed = true;
+        }
+        if (url.searchParams.has('openForm')) {
+          url.searchParams.delete('openForm');
+          changed = true;
+        }
+        if (url.hash.includes('formulario') || url.hash.includes('confirmar')) {
+          url.hash = '';
+          changed = true;
+        }
+        if (changed) {
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : '') + (url.hash ? url.hash : ''));
+        }
+      } catch {
+        // ignore url parsing error
+      }
+    }
+
+    // Restore exact scroll position without jumps or reload
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: savedScrollPosRef.current,
+        behavior: 'instant' as ScrollBehavior
+      });
+    });
+  };
+
+  // Listen to external popstate/hashchange in case user navigated directly with #formulario or ?confirmar=1
+  useEffect(() => {
+    if (shouldInitialAutoOpen()) {
+      setIsFormFullscreenOpen(true);
+    }
+  }, [code]);
+
+  // Lock background page scroll strictly while fullscreen is open
+  useEffect(() => {
+    if (isFormFullscreenOpen) {
+      const prevBodyOverflow = document.body.style.overflow;
+      const prevHtmlOverflow = document.documentElement.style.overflow;
+      const prevBodyTouchAction = document.body.style.touchAction;
+
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          closeFullscreenForm();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        document.body.style.overflow = prevBodyOverflow;
+        document.documentElement.style.overflow = prevHtmlOverflow;
+        document.body.style.touchAction = prevBodyTouchAction;
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [isFormFullscreenOpen]);
+
+  const showToast = (msg: string) => {
+    setToastNotice(msg);
+    setTimeout(() => setToastNotice(null), 3500);
+  };
+
+  const handleSaveInviteLocal = () => {
+    try {
+      const next = !isSavedLocal;
+      setIsSavedLocal(next);
+      localStorage.setItem('ativa_saved_invite', next ? 'true' : 'false');
+      showToast(next ? 'Convite salvo nos favoritos com sucesso!' : 'Convite removido dos favoritos.');
+    } catch {
+      showToast('Convite salvo temporariamente neste navegador.');
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!event) return;
+    setIsExportingPdf(true);
+    showToast('Processando download do convite em PDF otimizado...');
+    try {
+      const result = await generateInteractivePdf({
+        event,
+        hotspots: event.coverHotspots || [],
+        invitationCode: invitation?.code || 'geral',
+        autoDownload: true
+      });
+      showToast(`PDF baixado com sucesso: "${result.fileName}"!`);
+    } catch (err: any) {
+      console.error(err);
+      showToast('Não foi possível gerar o PDF: ' + (err.message || 'Erro ao carregar imagem'));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!event) return;
+    const inviteUrl = buildInvitationUrl(invitation?.code || 'geral');
+    const message = `🎉 *${event.shareTitle || event.title}*\n${
+      event.shareDescription || 'Confira o convite oficial e confirme sua presença.'
+    }\n\n📅 *Data:* ${formatDateBR(event.date)} às ${event.time}\n📍 *Local:* ${
+      event.address || event.location
+    }\n\n🔗 *Acesse o convite interativo e confirme sua presença:*\n${inviteUrl}`;
+
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   // Synchronize when prop changes
   useEffect(() => {
@@ -184,12 +351,8 @@ export const PublicInvitation: React.FC<Props> = ({
         setShowSuccessCard(true);
         setShowDeclinedCard(false);
 
-        // Confetti celebration
-        confetti({
-          particleCount: 100,
-          spread: 80,
-          origin: { y: 0.6 }
-        });
+        // Grande explosão comemorativa de confetes
+        fireCelebrationConfetti();
       } else {
         const res = await submitRsvp(invitation.code, {
           action: 'confirm',
@@ -204,11 +367,8 @@ export const PublicInvitation: React.FC<Props> = ({
         setShowSuccessCard(true);
         setShowDeclinedCard(false);
 
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
+        // Grande explosão comemorativa de confetes
+        fireCelebrationConfetti();
       }
     } catch (err: any) {
       alert(err.message || 'Erro ao confirmar presença');
@@ -266,10 +426,16 @@ export const PublicInvitation: React.FC<Props> = ({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+      <div
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{
+          background:
+            'radial-gradient(1100px 700px at 50% 0%, rgba(0, 122, 120, 0.12) 0%, transparent 60%), linear-gradient(165deg, #e6f6f5 0%, #f4faf9 35%, #ffffff 70%, #dcf1ef 100%)'
+        }}
+      >
+        <div className="bg-white border border-teal-200 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
           <div className="w-12 h-12 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <h2 className="text-xl font-extrabold text-black">Carregando formulário do convite...</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">Carregando formulário do convite...</h2>
           <p className="text-slate-600 text-xs mt-2 font-medium">Acessando informações e disponibilidade em tempo real</p>
         </div>
       </div>
@@ -278,12 +444,18 @@ export const PublicInvitation: React.FC<Props> = ({
 
   if (error || !event) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+      <div
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{
+          background:
+            'radial-gradient(1100px 700px at 50% 0%, rgba(0, 122, 120, 0.12) 0%, transparent 60%), linear-gradient(165deg, #e6f6f5 0%, #f4faf9 35%, #ffffff 70%, #dcf1ef 100%)'
+        }}
+      >
+        <div className="bg-white border border-teal-200 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
           <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-200">
             <AlertCircle size={32} />
           </div>
-          <h2 className="text-2xl font-black text-black mb-2">Convite Não Encontrado</h2>
+          <h2 className="text-2xl font-black text-slate-900 mb-2">Convite Não Encontrado</h2>
           <p className="text-slate-600 text-sm mb-6 leading-relaxed">
             {error || 'Não foi possível carregar as informações do convite.'}
           </p>
@@ -311,346 +483,276 @@ export const PublicInvitation: React.FC<Props> = ({
     );
   }
 
+  const handleCoverActionTrigger = (spot: any) => {
+    const spotName = (spot.name || '').toLowerCase();
+    const targetUrl = (spot.targetUrl || '').toLowerCase();
+    const isFormAction =
+      spot.actionType === 'confirm_rsvp' ||
+      spot.actionType === 'open_form' ||
+      spot.actionType === 'register' ||
+      targetUrl === '#formulario' ||
+      targetUrl.startsWith('#') ||
+      spotName.includes('confirm') ||
+      spotName.includes('presen') ||
+      spotName.includes('inscri') ||
+      spotName.includes('particip') ||
+      spotName.includes('cadastr') ||
+      spotName.includes('formul');
+
+    if (isFormAction) {
+      openFullscreenForm();
+      return;
+    }
+
+    let url = spot.targetUrl?.trim();
+    if (!url) return;
+
+    if (
+      !url.startsWith('http://') &&
+      !url.startsWith('https://') &&
+      !url.startsWith('mailto:') &&
+      !url.startsWith('tel:')
+    ) {
+      url = `https://${url}`;
+    }
+
+    if (spot.openInNewTab) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = url;
+    }
+  };
+
+  // Ensure responsive, instant-clickable cover areas even before custom setup
+  const effectiveHotspots =
+    event?.coverHotspots && event.coverHotspots.length > 0
+      ? event.coverHotspots
+      : [
+          {
+            id: 'hs-rsvp-default',
+            name: 'Confirmar Presença',
+            actionType: 'confirm_rsvp' as const,
+            targetUrl: '#formulario',
+            openInNewTab: false,
+            x: 15,
+            y: 73,
+            width: 70,
+            height: 14
+          },
+          {
+            id: 'hs-maps-default',
+            name: 'Como Chegar (Maps)',
+            actionType: 'google_maps' as const,
+            targetUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+              event?.address || event?.location || 'Grupo Ativa São Paulo'
+            )}`,
+            openInNewTab: true,
+            x: 15,
+            y: 88,
+            width: 70,
+            height: 10
+          }
+        ];
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 py-4 sm:py-8 px-3 sm:px-4 md:px-6 flex flex-col justify-between">
-      <div className="max-w-xl mx-auto w-full space-y-4">
-        
-        {/* View 1: Confirmed Pass Screen (After submission or if already confirmed) */}
-        {showSuccessCard && invitation ? (
-          <div
-            id="rsvp-success-pass"
-            className="bg-white border border-emerald-300 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl text-slate-900 animate-in fade-in zoom-in-95 duration-200"
-          >
-            <div className="text-center">
-              <div className="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-3 border border-emerald-300 shadow-md">
-                <CheckCircle2 size={32} />
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight mb-1">
-                Presença Confirmada!
-              </h2>
-              <p className="text-slate-600 text-xs sm:text-sm mb-5">
-                Seu passe de entrada foi gerado com sucesso. Apresente o QR Code na recepção.
-              </p>
+    <div
+      className="min-h-screen min-h-[100dvh] w-full max-w-full overflow-x-hidden text-slate-800 py-3 sm:py-6 px-3 sm:px-4 md:px-6 flex flex-col justify-between"
+      style={{
+        paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        background:
+          'radial-gradient(1100px 700px at 50% 0%, rgba(0, 122, 120, 0.12) 0%, transparent 60%), radial-gradient(850px 550px at 90% 90%, rgba(15, 118, 110, 0.08) 0%, transparent 55%), linear-gradient(165deg, #e6f6f5 0%, #f4faf9 30%, #ffffff 65%, #ddf2f0 100%)'
+      }}
+    >
+      <div className="max-w-xl md:max-w-2xl mx-auto w-full flex-1 flex flex-col justify-center space-y-3 sm:space-y-4 my-auto">
 
-              {/* QR Code Entry Pass */}
-              {qrDataUrl && (
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 max-w-[260px] sm:max-w-[280px] mx-auto mb-5 shadow-sm text-center">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    Passe de Entrada • Check-in
-                  </div>
-                  <img
-                    src={qrDataUrl}
-                    alt={`QR Code ${invitation.code}`}
-                    className="w-40 h-40 mx-auto rounded-xl bg-white p-2 border border-slate-200 object-contain block shadow-xs"
-                  />
-                  <div className="mt-2.5 font-mono font-black text-base sm:text-lg tracking-widest text-teal-900 bg-teal-50 py-1 px-3 rounded-lg border border-teal-200 inline-block">
-                    #{invitation.code}
-                  </div>
-                </div>
-              )}
-
-              {/* Data Summary Box */}
-              <div className="bg-slate-50 rounded-xl p-3.5 sm:p-4 border border-slate-200 text-left mb-5 space-y-2 text-xs sm:text-sm">
-                <div className="flex items-center justify-between gap-2 py-1 border-b border-slate-200">
-                  <span className="text-slate-500 font-medium">Condomínio:</span>
-                  <span className="font-bold text-black text-right truncate pl-2">{invitation.condoName}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2 py-1 border-b border-slate-200">
-                  <span className="text-slate-500 font-medium">Síndico(a):</span>
-                  <span className="font-bold text-black text-right truncate pl-2">{invitation.managerName}</span>
-                </div>
-                {invitation.janitorName && (
-                  <div className="flex items-center justify-between gap-2 py-1 border-b border-slate-200">
-                    <span className="text-slate-500 font-medium">Zelador(a):</span>
-                    <span className="font-bold text-black text-right truncate pl-2">{invitation.janitorName}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-2 py-1 border-b border-slate-200">
-                  <span className="text-slate-500 font-medium">Participantes:</span>
-                  <span className="font-bold text-teal-800 text-right">
-                    {invitation.participantCount} {invitation.participantCount === 1 ? 'Pessoa' : 'Pessoas'} (
-                    {invitation.attendeeRole === 'both'
-                      ? 'Síndico + Zelador'
-                      : invitation.attendeeRole === 'janitor'
-                      ? 'Zelador'
-                      : 'Síndico'}
-                    )
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-2 py-1">
-                  <span className="text-slate-500 font-medium">Local:</span>
-                  <span className="font-bold text-black text-right">{event.address}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => downloadCalendarFile(event)}
-                  className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white font-bold py-3 px-4 rounded-xl transition shadow-md text-xs sm:text-sm min-h-[44px]"
-                >
-                  <Download size={16} />
-                  <span>Salvar na Agenda (.ics)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSuccessCard(false)}
-                  className="w-full sm:flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-4 rounded-xl border border-slate-300 transition text-xs sm:text-sm min-h-[44px]"
-                >
-                  Editar / Alterar Dados
-                </button>
-              </div>
+        {/* Feedback Toast */}
+        {toastNotice && (
+          <div className="bg-[#007A78] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center justify-between animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Sparkles size={15} className="text-teal-200 shrink-0" />
+              <span>{toastNotice}</span>
             </div>
-          </div>
-        ) : showDeclinedCard && invitation ? (
-          /* View 2: Declined Screen */
-          <div className="bg-white border border-rose-200 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl text-slate-900 text-center">
-            <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3 border border-rose-200">
-              <XCircle size={32} />
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-black mb-1.5 tracking-tight">Resposta Registrada</h2>
-            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed mb-5 max-w-md mx-auto">
-              Registramos que você não poderá comparecer ao evento. Agradecemos pela resposta.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowDeclinedCard(false);
-                setShowSuccessCard(false);
-              }}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-6 rounded-xl transition text-xs sm:text-sm shadow-md min-h-[44px]"
-            >
-              Mudei de ideia: Desejo Confirmar Presença
+            <button onClick={() => setToastNotice(null)} className="text-teal-100 hover:text-white text-xs ml-2 font-bold cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center">
+              ✕
             </button>
-          </div>
-        ) : (
-          /* View 3: Direct Registration / Confirmation Form (Opened immediately on link click) */
-          <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-7 md:p-8 shadow-2xl text-slate-900">
-            <div className="mb-5 pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2 text-teal-700 font-bold text-xs tracking-wider uppercase mb-1">
-                <Sparkles size={14} className="text-teal-600 shrink-0" />
-                <span>Confirmação Imediata</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                Preencha os Dados para Inscrição
-              </h2>
-              <p className="text-slate-600 text-xs sm:text-sm mt-1 leading-relaxed">
-                Informe os dados do seu condomínio para garantir as vagas e emitir o passe de acesso.
-              </p>
-            </div>
-
-            <form onSubmit={handleConfirm} className="space-y-4 sm:space-y-5">
-              {/* Condomínio */}
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Nome do Condomínio / Edifício <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <Building2 size={18} />
-                  </div>
-                  <input
-                    id="input-condo-name"
-                    type="text"
-                    required
-                    value={condoName}
-                    onChange={(e) => setCondoName(e.target.value)}
-                    placeholder="Ex: Condomínio Residencial Solar das Palmeiras"
-                    className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-black font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 text-xs sm:text-sm shadow-xs min-h-[44px]"
-                  />
-                </div>
-              </div>
-
-              {/* Síndico */}
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Nome do Síndico(a) ou Representante <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <User size={18} />
-                  </div>
-                  <input
-                    id="input-manager-name"
-                    type="text"
-                    required
-                    value={managerName}
-                    onChange={(e) => setManagerName(e.target.value)}
-                    placeholder="Nome completo do síndico(a)"
-                    className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-black font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 text-xs sm:text-sm shadow-xs min-h-[44px]"
-                  />
-                </div>
-              </div>
-
-              {/* Zelador */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-black uppercase tracking-wider">
-                    Nome do Zelador(a) / Encarregado
-                  </label>
-                  <span className="text-xs text-slate-500 font-semibold">
-                    {event.requireJanitor ? '(Obrigatório)' : '(Opcional)'}
-                  </span>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <User size={18} />
-                  </div>
-                  <input
-                    id="input-janitor-name"
-                    type="text"
-                    required={event.requireJanitor}
-                    value={janitorName}
-                    onChange={(e) => setJanitorName(e.target.value)}
-                    placeholder="Nome do zelador ou encarregado"
-                    className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-black font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 text-xs sm:text-sm shadow-xs min-h-[44px]"
-                  />
-                </div>
-              </div>
-
-              {/* WhatsApp */}
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  WhatsApp para Contato <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                    <Phone size={18} />
-                  </div>
-                  <input
-                    id="input-whatsapp"
-                    type="tel"
-                    required
-                    value={whatsapp}
-                    onChange={handlePhoneChange}
-                    placeholder="+55 (11) 99999-9999"
-                    className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-black font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 text-xs sm:text-sm font-mono shadow-xs min-h-[44px]"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                  Enviaremos a confirmação e QR Code para este número.
-                </p>
-              </div>
-
-              {/* Quem participará */}
-              <div className="pt-1">
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-2">
-                  Quem participará do evento?
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAttendeeRole('manager')}
-                    className={`py-3 px-3 rounded-xl border text-xs sm:text-sm font-medium transition flex flex-col items-center justify-center gap-1 min-h-[44px] ${
-                      attendeeRole === 'manager'
-                        ? 'bg-teal-50 border-teal-600 text-black ring-2 ring-teal-600/30'
-                        : 'bg-slate-50 border-slate-300 text-black hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="font-bold text-black">Apenas Síndico(a)</span>
-                    <span className="text-[11px] text-slate-600 font-medium">1 participante</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAttendeeRole('janitor')}
-                    className={`py-3 px-3 rounded-xl border text-xs sm:text-sm font-medium transition flex flex-col items-center justify-center gap-1 min-h-[44px] ${
-                      attendeeRole === 'janitor'
-                        ? 'bg-teal-50 border-teal-600 text-black ring-2 ring-teal-600/30'
-                        : 'bg-slate-50 border-slate-300 text-black hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="font-bold text-black">Apenas Zelador</span>
-                    <span className="text-[11px] text-slate-600 font-medium">1 participante</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAttendeeRole('both')}
-                    className={`py-3 px-3 rounded-xl border text-xs sm:text-sm font-medium transition flex flex-col items-center justify-center gap-1 min-h-[44px] ${
-                      attendeeRole === 'both'
-                        ? 'bg-teal-50 border-teal-600 text-black ring-2 ring-teal-600/30'
-                        : 'bg-slate-50 border-slate-300 text-black hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="font-black text-black">Síndico + Zelador</span>
-                    <span className="text-[11px] text-teal-800 font-bold">2 participantes</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Observações / Notas */}
-              <div>
-                <label className="block text-xs font-bold text-black uppercase tracking-wider mb-1.5">
-                  Observações ou Dúvidas <span className="text-slate-500 font-normal">(Opcional)</span>
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Ex: Chegaremos por volta das 14h / Dúvidas sobre o local"
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-black font-semibold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 text-xs shadow-xs"
-                />
-              </div>
-
-              {/* Submit Action */}
-              <div className="pt-2 space-y-2.5">
-                <button
-                  id="btn-confirm-attendance"
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 px-4 rounded-xl shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2 text-sm sm:text-base tracking-wide disabled:opacity-50 min-h-[48px]"
-                >
-                  <CheckCircle2 size={20} />
-                  <span>
-                    {submitting
-                      ? 'PROCESSANDO INSCRIÇÃO...'
-                      : 'CONFIRMAR PRESENÇA & GERAR ACESSO'}
-                  </span>
-                </button>
-
-                {invitation && (
-                  <button
-                    id="btn-decline-attendance"
-                    type="button"
-                    onClick={handleDecline}
-                    disabled={submitting}
-                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-black font-bold py-3 px-4 rounded-xl border border-slate-300 transition text-xs disabled:opacity-50 min-h-[44px]"
-                  >
-                    NÃO PODEREI COMPARECER
-                  </button>
-                )}
-              </div>
-            </form>
-
-            {/* Address and Map link at the bottom of form */}
-            <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
-              <div className="flex items-center gap-2 min-w-0 pr-2">
-                <MapPin size={14} className="text-teal-700 shrink-0" />
-                <span className="truncate">{event.address}</span>
-              </div>
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  `${event.location}, ${event.address}`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-teal-700 hover:text-teal-900 font-bold shrink-0 inline-flex items-center gap-1"
-              >
-                <span>Ver Mapa</span>
-                <ExternalLink size={12} />
-              </a>
-            </div>
           </div>
         )}
 
-        {/* Footer info */}
-        <div className="text-center text-[11px] text-slate-400 font-medium py-2">
+        {/* Card Principal do Convite com degrade nos tons claros da logo Ativa */}
+        <div
+          className="rounded-2xl sm:rounded-3xl overflow-hidden border border-teal-200/90 shadow-2xl shadow-teal-950/10"
+          style={{
+            background: 'linear-gradient(155deg, #ffffff 0%, #f6fbfb 50%, #edf7f6 100%)'
+          }}
+        >
+          {/* Arte / Capa Interativa Oficial com Hiperlinks Invisíveis */}
+          {event?.bannerUrl ? (
+            <div
+              className="w-full overflow-hidden flex items-center justify-center border-b border-teal-100/90"
+              style={{
+                background: 'linear-gradient(145deg, #e8f7f6 0%, #f4faf9 50%, #e1f4f2 100%)'
+              }}
+            >
+              <InteractiveCoverViewer
+                imageUrl={event.bannerUrl}
+                altText={event.title}
+                hotspots={effectiveHotspots}
+                showHotspotBorders={false}
+                interactive={true}
+                onActionTrigger={handleCoverActionTrigger}
+              />
+            </div>
+          ) : (
+            <div
+              className="p-6 sm:p-8 text-center border-b border-teal-100/90"
+              style={{
+                background: 'linear-gradient(145deg, #e4f5f4 0%, #f4faf9 50%, #ffffff 100%)'
+              }}
+            >
+              <span className="inline-block px-3 py-1 rounded-full bg-teal-100 text-[#007A78] font-bold text-xs uppercase tracking-wider mb-3 border border-teal-200">
+                Convite Oficial • Grupo Ativa
+              </span>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 mb-2 tracking-tight">
+                {event?.title}
+              </h1>
+              {event?.description && (
+                <p className="text-slate-600 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+                  {event.description}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Dados do Evento (Data, Horário e Local) */}
+          <div className="px-3.5 sm:px-5 py-3 bg-white/90 border-t border-teal-100/90 text-xs sm:text-sm text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="flex items-center gap-2">
+              <Calendar size={15} className="text-[#007A78] shrink-0" />
+              <span>
+                <strong className="text-slate-900">{event ? formatDateBR(event.date) : ''}</strong>
+                {event?.time ? ` às ${event.time}` : ''}
+              </span>
+            </div>
+            {event?.address && (
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin size={15} className="text-[#007A78] shrink-0" />
+                <span className="truncate text-slate-700" title={event.address}>
+                  {event.address}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Botões Principais: “Confirmar presença” e “Como chegar” (Lado a lado em desktop/tablet, 1 coluna em celular) */}
+          <div className="p-3.5 sm:p-5 bg-gradient-to-r from-teal-50/80 via-white to-teal-50/80 border-t border-teal-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+            {/* Botão 1: Confirmar presença */}
+            <button
+              type="button"
+              id="btn-abrir-confirmacao-presenca"
+              onClick={openFullscreenForm}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-sm sm:text-base font-black transition shadow-lg shadow-emerald-700/20 min-h-[48px] cursor-pointer tracking-wide"
+            >
+              <CheckCircle2 size={18} />
+              <span>
+                {showSuccessCard
+                  ? '✓ Presença Confirmada'
+                  : 'Confirmar presença'}
+              </span>
+            </button>
+
+            {/* Botão 2: Como chegar (Google Maps) */}
+            <a
+              id="btn-como-chegar-maps"
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                `${event?.location || 'Grupo Ativa'}, ${event?.address || ''}`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 bg-[#007A78] hover:bg-[#006866] active:bg-[#005452] text-white rounded-xl text-sm sm:text-base font-bold transition shadow-md shadow-teal-900/15 border border-teal-700/30 min-h-[48px] cursor-pointer tracking-wide"
+              title="Abrir localização no Google Maps"
+            >
+              <MapPin size={18} />
+              <span>Como chegar</span>
+            </a>
+          </div>
+
+          {/* Ações Secundárias do Convite: Salvar Convite, Baixar em PDF, Compartilhar no WhatsApp */}
+          <div className="px-3.5 sm:px-5 pb-3.5 sm:pb-4 pt-2.5 bg-slate-50/90 border-t border-teal-100/90 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Salvar Convite */}
+              <button
+                type="button"
+                id="btn-salvar-convite"
+                onClick={handleSaveInviteLocal}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition border border-slate-200 shadow-2xs min-h-[44px] cursor-pointer"
+                title="Salvar este convite nos favoritos"
+              >
+                <Bookmark size={14} className={isSavedLocal ? 'text-[#007A78] fill-[#007A78]' : 'text-slate-400'} />
+                <span>{isSavedLocal ? 'Salvo!' : 'Salvar'}</span>
+              </button>
+
+              {/* Baixar em PDF */}
+              <button
+                type="button"
+                id="btn-baixar-pdf"
+                onClick={handleDownloadPdf}
+                disabled={isExportingPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold transition border border-slate-200 shadow-2xs disabled:opacity-50 min-h-[44px] cursor-pointer"
+                title="Baixar convite em PDF com hiperlinks interativos"
+              >
+                <Download size={14} className="text-[#007A78]" />
+                <span>{isExportingPdf ? 'Gerando...' : 'Baixar PDF'}</span>
+              </button>
+            </div>
+
+            {/* Compartilhar no WhatsApp */}
+            <button
+              type="button"
+              id="btn-compartilhar-whatsapp"
+              onClick={handleShareWhatsApp}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition shadow-2xs min-h-[44px] cursor-pointer"
+              title="Compartilhar convite no WhatsApp"
+            >
+              <MessageCircle size={14} className="text-emerald-600" />
+              <span>WhatsApp</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Rodapé institucional discreto */}
+        <div className="text-center text-[11px] text-slate-500 font-medium py-2">
           Grupo Ativa • Gestão Corporativa de Eventos e Condomínios
         </div>
       </div>
+
+      {/* Modal / Camada Fullscreen de Confirmação de Presença (100dvw x 100dvh) */}
+      <FullscreenRsvpModal
+        isOpen={isFormFullscreenOpen}
+        onClose={closeFullscreenForm}
+        event={event}
+        invitation={invitation}
+        showSuccessCard={showSuccessCard}
+        showDeclinedCard={showDeclinedCard}
+        qrDataUrl={qrDataUrl}
+        submitting={submitting}
+        condoName={condoName}
+        setCondoName={setCondoName}
+        managerName={managerName}
+        setManagerName={setManagerName}
+        janitorName={janitorName}
+        setJanitorName={setJanitorName}
+        whatsapp={whatsapp}
+        handlePhoneChange={handlePhoneChange}
+        attendeeRole={attendeeRole}
+        setAttendeeRole={setAttendeeRole}
+        notes={notes}
+        setNotes={setNotes}
+        handleConfirm={handleConfirm}
+        handleDecline={handleDecline}
+        setShowSuccessCard={setShowSuccessCard}
+        setShowDeclinedCard={setShowDeclinedCard}
+        downloadCalendarFile={downloadCalendarFile}
+      />
     </div>
   );
 };
