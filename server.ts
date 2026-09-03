@@ -22,6 +22,17 @@ app.use('/api', (req, res, next) => {
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 const DB_BACKUP_FILE = path.join(DATA_DIR, 'database.backup.json');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Serve uploaded static assets directly with permanent URL access
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 interface DatabaseSchema {
   adminPin: string;
@@ -345,45 +356,105 @@ function getInitialData(): DatabaseSchema {
 
 let db: DatabaseSchema;
 
+// Helper to persist base64 data URIs into physical static files
+function persistBase64Image(dataUri: string, prefix = 'cover'): string {
+  if (!dataUri || typeof dataUri !== 'string') return dataUri;
+  if (!dataUri.startsWith('data:image')) {
+    return dataUri;
+  }
+  try {
+    const matches = dataUri.match(/^data:([A-Za-z0-9-+\/]+);base64,(.+)$/);
+    if (!matches) return dataUri;
+    const mimeType = matches[1].toLowerCase();
+    let ext = 'png';
+    if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
+    else if (mimeType.includes('webp')) ext = 'webp';
+    else if (mimeType.includes('gif')) ext = 'gif';
+    else if (mimeType.includes('svg')) ext = 'svg';
+
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    }
+
+    const safeFilename = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const filePath = path.join(UPLOADS_DIR, safeFilename);
+    const buffer = Buffer.from(matches[2], 'base64');
+    fs.writeFileSync(filePath, buffer);
+    console.log(`[Storage] Persisted image file to ${filePath} (${buffer.length} bytes)`);
+    return `/uploads/${safeFilename}`;
+  } catch (err) {
+    console.error('[Storage] Error persisting base64 image to file:', err);
+    return dataUri;
+  }
+}
+
 function loadDatabase(): DatabaseSchema {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    }
+
+    let loaded: DatabaseSchema | null = null;
+
     if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, 'utf-8');
-      db = JSON.parse(raw);
-      if (db && Array.isArray(db.events) && db.events.length > 0) {
-        console.log(`[DB] Database loaded successfully from ${DB_FILE}. Found ${db.events.length} event(s).`);
-        return db;
+      try {
+        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.events)) {
+          loaded = parsed;
+          console.log(`[DB] Database loaded successfully from ${DB_FILE}. Found ${loaded.events.length} event(s).`);
+        }
+      } catch (parseErr) {
+        console.error('[DB] Error parsing primary DB_FILE:', parseErr);
       }
     }
-    // If DB_FILE is missing or empty, check DB_BACKUP_FILE
-    if (fs.existsSync(DB_BACKUP_FILE)) {
-      const rawBackup = fs.readFileSync(DB_BACKUP_FILE, 'utf-8');
-      const backupDb = JSON.parse(rawBackup);
-      if (backupDb && Array.isArray(backupDb.events) && backupDb.events.length > 0) {
-        db = backupDb;
-        saveDatabase();
-        console.log(`[DB] Database restored successfully from backup.`);
-        return db;
-      }
-    }
-  } catch (err) {
-    console.error('CRITICAL: Error loading primary database, attempting backup restoration:', err);
-    if (fs.existsSync(DB_BACKUP_FILE)) {
+
+    // If DB_FILE failed or was missing, attempt restore from backup
+    if (!loaded && fs.existsSync(DB_BACKUP_FILE)) {
       try {
         const rawBackup = fs.readFileSync(DB_BACKUP_FILE, 'utf-8');
-        db = JSON.parse(rawBackup);
-        console.log('[DB] Recovered database state from backup file.');
-        return db;
+        const backupDb = JSON.parse(rawBackup);
+        if (backupDb && typeof backupDb === 'object' && Array.isArray(backupDb.events)) {
+          loaded = backupDb;
+          console.log('[DB] Database restored successfully from backup copy.');
+        }
       } catch (backupErr) {
-        console.error('CRITICAL: Backup file is also corrupt:', backupErr);
+        console.error('[DB] Backup file also corrupt:', backupErr);
       }
     }
+
+    if (loaded) {
+      db = loaded;
+      if (!Array.isArray(db.invitations)) db.invitations = [];
+      if (!Array.isArray(db.notifications)) db.notifications = [];
+      if (!db.adminPin) db.adminPin = 'admin123';
+
+      // Auto-migrate any legacy base64 images into persistent storage files
+      let migrated = false;
+      for (const ev of db.events) {
+        if (ev.bannerUrl && ev.bannerUrl.startsWith('data:image')) {
+          ev.bannerUrl = persistBase64Image(ev.bannerUrl, 'cover');
+          migrated = true;
+        }
+        if (ev.logoUrl && ev.logoUrl.startsWith('data:image')) {
+          ev.logoUrl = persistBase64Image(ev.logoUrl, 'logo');
+          migrated = true;
+        }
+      }
+      if (migrated) {
+        saveDatabase();
+        console.log('[DB] Migrated existing base64 images to persistent storage files.');
+      }
+      return db;
+    }
+  } catch (err) {
+    console.error('CRITICAL: Error in loadDatabase:', err);
   }
 
-  console.log('[DB] Initializing default database schema.');
+  console.log('[DB] Initializing default database schema for first-time boot.');
   db = getInitialData();
   try {
     saveDatabase();
@@ -395,6 +466,10 @@ function loadDatabase(): DatabaseSchema {
 
 function saveDatabase() {
   try {
+    if (!db || typeof db !== 'object' || !Array.isArray(db.events)) {
+      console.error('[DB] Blocked saving invalid/empty database schema.');
+      return false;
+    }
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
@@ -445,6 +520,44 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   next();
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', database: 'connected', eventsCount: db.events.length, invitationsCount: db.invitations.length });
+});
+
+// Permanent Image Storage Upload Endpoint
+app.post('/api/upload', (req, res) => {
+  try {
+    const { image, filename } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Nenhuma imagem enviada para upload.' });
+    }
+
+    if (typeof image === 'string' && image.startsWith('data:image')) {
+      const sanitizedName = (filename || 'cover')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .slice(0, 30);
+      const url = persistBase64Image(image, sanitizedName || 'cover');
+      
+      if (!url || url.startsWith('data:image')) {
+        return res.status(500).json({ error: 'Falha ao gravar arquivo de imagem no storage persistente.' });
+      }
+
+      console.log(`[Storage] Upload processed successfully. Permanent URL: ${url}`);
+      return res.json({
+        success: true,
+        url,
+        message: 'Imagem salva com sucesso no storage persistente'
+      });
+    }
+
+    return res.status(400).json({ error: 'Formato inválido. A imagem deve ser fornecida em Data URI base64.' });
+  } catch (err: any) {
+    console.error('[Storage] Error in /api/upload:', err);
+    return res.status(500).json({ error: err.message || 'Erro ao processar upload da imagem' });
+  }
 });
 
 // SSE stream for real-time live updates
@@ -706,6 +819,14 @@ app.post('/api/events', (req, res) => {
     return res.status(400).json({ error: 'Título, data e horário são obrigatórios.' });
   }
 
+  const persistedBannerUrl = bannerUrl && typeof bannerUrl === 'string' && bannerUrl.startsWith('data:image')
+    ? persistBase64Image(bannerUrl, 'cover')
+    : (bannerUrl || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80');
+
+  const persistedLogoUrl = logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('data:image')
+    ? persistBase64Image(logoUrl, 'logo')
+    : (logoUrl || '');
+
   const newEvent: CondoEvent = {
     id: `evt-${Date.now()}`,
     title,
@@ -713,14 +834,12 @@ app.post('/api/events', (req, res) => {
     time,
     location: location || 'Auditório Principal',
     address: address || '',
-    bannerUrl:
-      bannerUrl ||
-      'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
-    logoUrl: logoUrl || '',
+    bannerUrl: persistedBannerUrl,
+    logoUrl: persistedLogoUrl,
     presentationText: presentationText || 'Preencha os dados abaixo para confirmar sua presença no evento.',
     shareTitle: req.body.shareTitle || title,
     shareDescription: req.body.shareDescription || 'Convite especial para Síndicos e Zeladores. Confirme sua presença.',
-    coverHotspots: req.body.coverHotspots || [],
+    coverHotspots: Array.isArray(req.body.coverHotspots) ? req.body.coverHotspots : [],
     requireJanitor: !!requireJanitor,
     maxParticipants: Number(maxParticipants) || 50,
     confirmationDeadline: confirmationDeadline || date,
@@ -754,9 +873,29 @@ app.put('/api/events/:id', (req, res) => {
     return res.status(404).json({ error: 'Evento não encontrado.' });
   }
 
+  const payload = { ...req.body };
+
+  // Persist images to storage if base64 Data URIs
+  if (payload.bannerUrl && typeof payload.bannerUrl === 'string' && payload.bannerUrl.startsWith('data:image')) {
+    payload.bannerUrl = persistBase64Image(payload.bannerUrl, 'cover');
+  }
+  if (payload.logoUrl && typeof payload.logoUrl === 'string' && payload.logoUrl.startsWith('data:image')) {
+    payload.logoUrl = persistBase64Image(payload.logoUrl, 'logo');
+  }
+  if (payload.shareImageUrl && typeof payload.shareImageUrl === 'string' && payload.shareImageUrl.startsWith('data:image')) {
+    payload.shareImageUrl = persistBase64Image(payload.shareImageUrl, 'share');
+  }
+
+  const existing = db.events[eventIndex];
+
+  // Prevent an empty coverHotspots or null/undefined payload fields from wiping valid data
+  if (payload.coverHotspots !== undefined && !Array.isArray(payload.coverHotspots)) {
+    delete payload.coverHotspots;
+  }
+
   const updated: CondoEvent = {
-    ...db.events[eventIndex],
-    ...req.body,
+    ...existing,
+    ...payload,
     updatedAt: new Date().toISOString()
   };
 

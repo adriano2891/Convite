@@ -536,6 +536,24 @@ export const PublicInvitation: React.FC<Props> = ({
           }
         ];
 
+  if (loading && !event) {
+    return (
+      <div
+        className="min-h-screen min-h-[100dvh] w-full flex items-center justify-center p-4 text-slate-800"
+        style={{
+          background:
+            'radial-gradient(1100px 700px at 50% 0%, rgba(0, 122, 120, 0.12) 0%, transparent 60%), linear-gradient(165deg, #e6f6f5 0%, #f4faf9 30%, #ffffff 65%, #ddf2f0 100%)'
+        }}
+      >
+        <div className="bg-white/95 backdrop-blur-md p-8 rounded-3xl border border-teal-200 shadow-xl flex flex-col items-center gap-4 max-w-sm text-center">
+          <div className="w-10 h-10 rounded-full border-4 border-teal-200 border-t-[#007A78] animate-spin" />
+          <h2 className="text-sm font-bold text-slate-800">Carregando convite...</h2>
+          <p className="text-xs text-slate-500">Recuperando informações salvas no banco de dados...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="min-h-screen min-h-[100dvh] w-full max-w-full overflow-x-hidden text-slate-800 py-3 sm:py-6 px-3 sm:px-4 md:px-6 flex flex-col justify-between"

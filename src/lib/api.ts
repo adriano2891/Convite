@@ -2,6 +2,37 @@ import { CondoEvent, Invitation, NotificationItem } from '../types';
 
 export const API_BASE = '/api';
 
+export async function uploadImage(fileOrBase64: File | string, filename?: string): Promise<{ url: string; success: boolean }> {
+  let base64 = '';
+  let name = filename || 'image.png';
+
+  if (typeof fileOrBase64 === 'string') {
+    base64 = fileOrBase64;
+  } else {
+    name = fileOrBase64.name;
+    base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(fileOrBase64);
+    });
+  }
+
+  const res = await fetch(`${API_BASE}/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64, filename: name }),
+    cache: 'no-store'
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Falha no upload da imagem para o storage.');
+  }
+
+  return res.json();
+}
+
 export async function fetchEvents(): Promise<CondoEvent[]> {
   const res = await fetch(`${API_BASE}/events`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Falha ao carregar eventos');

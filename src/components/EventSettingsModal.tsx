@@ -20,7 +20,7 @@ import {
   Eye
 } from 'lucide-react';
 import { CondoEvent } from '../types';
-import { updateEvent, createEvent, deleteEvent, changeAdminPassword } from '../lib/api';
+import { updateEvent, createEvent, deleteEvent, changeAdminPassword, uploadImage } from '../lib/api';
 
 const QUICK_COVER_PRESETS = [
   {
@@ -69,21 +69,21 @@ export const EventSettingsModal: React.FC<Props> = ({
   const [activeTab, setActiveTab] = useState<'details' | 'whatsapp' | 'security' | 'events'>('details');
 
   // Event form
-  const [title, setTitle] = useState(currentEvent.title);
-  const [date, setDate] = useState(currentEvent.date);
-  const [time, setTime] = useState(currentEvent.time);
-  const [location, setLocation] = useState(currentEvent.location);
-  const [address, setAddress] = useState(currentEvent.address || '');
-  const [bannerUrl, setBannerUrl] = useState(currentEvent.bannerUrl || '');
-  const [logoUrl, setLogoUrl] = useState(currentEvent.logoUrl || '');
-  const [presentationText, setPresentationText] = useState(currentEvent.presentationText);
-  const [requireJanitor, setRequireJanitor] = useState(currentEvent.requireJanitor);
-  const [maxParticipants, setMaxParticipants] = useState(currentEvent.maxParticipants);
-  const [confirmationDeadline, setConfirmationDeadline] = useState(currentEvent.confirmationDeadline);
-  const [waitingListEnabled, setWaitingListEnabled] = useState(currentEvent.waitingListEnabled);
+  const [title, setTitle] = useState(currentEvent?.title || '');
+  const [date, setDate] = useState(currentEvent?.date || '');
+  const [time, setTime] = useState(currentEvent?.time || '');
+  const [location, setLocation] = useState(currentEvent?.location || '');
+  const [address, setAddress] = useState(currentEvent?.address || '');
+  const [bannerUrl, setBannerUrl] = useState(currentEvent?.bannerUrl || '');
+  const [logoUrl, setLogoUrl] = useState(currentEvent?.logoUrl || '');
+  const [presentationText, setPresentationText] = useState(currentEvent?.presentationText || '');
+  const [requireJanitor, setRequireJanitor] = useState(currentEvent?.requireJanitor || false);
+  const [maxParticipants, setMaxParticipants] = useState(currentEvent?.maxParticipants || 50);
+  const [confirmationDeadline, setConfirmationDeadline] = useState(currentEvent?.confirmationDeadline || '');
+  const [waitingListEnabled, setWaitingListEnabled] = useState(currentEvent?.waitingListEnabled ?? true);
 
   // WhatsApp templates
-  const [templates, setTemplates] = useState({ ...currentEvent.whatsappTemplates });
+  const [templates, setTemplates] = useState({ ...(currentEvent?.whatsappTemplates || {}) });
 
   // Security / PIN
   const [currentPin, setCurrentPin] = useState('');
@@ -101,40 +101,50 @@ export const EventSettingsModal: React.FC<Props> = ({
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 5MB.');
+    if (file.size > 25 * 1024 * 1024) {
+      setSaveErrorMessage('A imagem deve ter no máximo 25MB.');
       return;
     }
     const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
+    reader.onload = async (uploadEvent) => {
       const result = uploadEvent.target?.result as string;
       if (result) {
         setBannerUrl(result);
+        try {
+          const res = await uploadImage(file);
+          if (res?.url) {
+            setBannerUrl(res.url);
+          }
+        } catch (uploadErr) {
+          console.warn('Storage upload fallback:', uploadErr);
+        }
       }
     };
     reader.readAsDataURL(file);
   };
 
   useEffect(() => {
-    setTitle(currentEvent.title);
-    setDate(currentEvent.date);
-    setTime(currentEvent.time);
-    setLocation(currentEvent.location);
-    setAddress(currentEvent.address || '');
-    setBannerUrl(currentEvent.bannerUrl || '');
-    setLogoUrl(currentEvent.logoUrl || '');
-    setPresentationText(currentEvent.presentationText);
-    setRequireJanitor(currentEvent.requireJanitor);
-    setMaxParticipants(currentEvent.maxParticipants);
-    setConfirmationDeadline(currentEvent.confirmationDeadline);
-    setWaitingListEnabled(currentEvent.waitingListEnabled);
-    setTemplates({ ...currentEvent.whatsappTemplates });
+    if (currentEvent && isOpen) {
+      setTitle(currentEvent.title || '');
+      setDate(currentEvent.date || '');
+      setTime(currentEvent.time || '');
+      setLocation(currentEvent.location || '');
+      setAddress(currentEvent.address || '');
+      setBannerUrl(currentEvent.bannerUrl || '');
+      setLogoUrl(currentEvent.logoUrl || '');
+      setPresentationText(currentEvent.presentationText || '');
+      setRequireJanitor(currentEvent.requireJanitor || false);
+      setMaxParticipants(currentEvent.maxParticipants || 50);
+      setConfirmationDeadline(currentEvent.confirmationDeadline || '');
+      setWaitingListEnabled(currentEvent.waitingListEnabled ?? true);
+      setTemplates({ ...(currentEvent.whatsappTemplates || {}) });
+    }
   }, [currentEvent, isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !currentEvent) return null;
 
   const handleSaveDetails = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -142,20 +152,32 @@ export const EventSettingsModal: React.FC<Props> = ({
     setSaveErrorMessage(null);
     try {
       setSaving(true);
+      let finalBannerUrl = bannerUrl;
+      if (finalBannerUrl && finalBannerUrl.startsWith('data:image')) {
+        try {
+          const res = await uploadImage(finalBannerUrl, 'cover');
+          if (res?.url) {
+            finalBannerUrl = res.url;
+            setBannerUrl(res.url);
+          }
+        } catch {}
+      }
+
       const updated = await updateEvent(currentEvent.id, {
-        title,
+        title: title.trim() || currentEvent.title,
         date,
         time,
         location,
         address,
-        bannerUrl,
+        bannerUrl: finalBannerUrl,
         logoUrl,
         presentationText,
         requireJanitor,
         maxParticipants: Number(maxParticipants),
         confirmationDeadline,
         waitingListEnabled,
-        whatsappTemplates: templates
+        whatsappTemplates: templates,
+        coverHotspots: currentEvent.coverHotspots || []
       });
 
       const updatedList = allEvents.map((ev) => (ev.id === updated.id ? updated : ev));

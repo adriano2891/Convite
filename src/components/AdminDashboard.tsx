@@ -162,17 +162,24 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
     setSaveToast({ type: 'error', message, onRetry });
   };
 
-  // Load initial data
+  // Load initial data directly from database
   const loadAllData = async () => {
     try {
       setLoading(true);
       const allEvents = await fetchEvents();
       setEvents(allEvents);
 
-      if (allEvents.length > 0) {
+      if (allEvents && allEvents.length > 0) {
+        // Sort events so most recently updated event is selected first
+        const sorted = [...allEvents].sort((a, b) => {
+          const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
+
         const current = activeEvent
-          ? allEvents.find((e) => e.id === activeEvent.id) || allEvents[0]
-          : allEvents[0];
+          ? sorted.find((e) => e.id === activeEvent.id) || sorted[0]
+          : sorted[0];
         setActiveEvent(current);
 
         const invs = await fetchInvitations(current.id);
@@ -182,7 +189,7 @@ export const AdminDashboard: React.FC<Props> = ({ onOpenPublicInvitation }) => {
       const notifs = await fetchNotifications();
       setNotifications(notifs);
     } catch (err) {
-      console.error('Error loading data:', err);
+      console.error('Error loading data from server:', err);
     } finally {
       setLoading(false);
     }

@@ -29,7 +29,7 @@ import {
   Smartphone
 } from 'lucide-react';
 import { CondoEvent, CoverHotspot, HotspotActionType } from '../types';
-import { updateEvent } from '../lib/api';
+import { updateEvent, uploadImage } from '../lib/api';
 import { generateInteractivePdf, getPdfFileName } from '../lib/interactivePdf';
 import { buildInvitationUrl, formatDateBR } from '../lib/utils';
 import { InteractiveCoverViewer } from './InteractiveCoverViewer';
@@ -83,10 +83,12 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
   onEventUpdated
 }) => {
   // Event & Cover State
-  const [currentBannerUrl, setCurrentBannerUrl] = useState(event.bannerUrl || COVER_PRESETS[0].url);
-  const [eventTitle, setEventTitle] = useState(event.title);
+  const [currentBannerUrl, setCurrentBannerUrl] = useState(event?.bannerUrl || COVER_PRESETS[0].url);
+  const [eventTitle, setEventTitle] = useState(event?.title || '');
+  const [presentationText, setPresentationText] = useState(event?.presentationText || '');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [hotspots, setHotspots] = useState<CoverHotspot[]>(() => {
-    if (event.coverHotspots && event.coverHotspots.length > 0) {
+    if (event?.coverHotspots && event.coverHotspots.length > 0) {
       return event.coverHotspots;
     }
     // Default initial hotspots for instant out-of-the-box interactivity
@@ -107,7 +109,7 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
         name: 'Como Chegar (Maps)',
         actionType: 'google_maps',
         targetUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          event.address || event.location || 'Grupo Ativa São Paulo'
+          event?.address || event?.location || 'Grupo Ativa São Paulo'
         )}`,
         openInNewTab: true,
         x: 20,
@@ -151,9 +153,10 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
 
   // Sync with prop changes on open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && event) {
       setCurrentBannerUrl(event.bannerUrl || COVER_PRESETS[0].url);
-      setEventTitle(event.title);
+      setEventTitle(event.title || '');
+      setPresentationText(event.presentationText || '');
       if (event.coverHotspots && event.coverHotspots.length > 0) {
         setHotspots(event.coverHotspots);
         setSelectedHotspotId(event.coverHotspots[0].id);
@@ -388,40 +391,72 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
     }
   };
 
-  // Image Upload handler
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload handler with instant preview and persistent storage upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      showToast('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WebP).');
+      showToast('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WebP).', 'error');
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      showToast('A imagem excede 8MB. Selecione uma imagem menor.');
+    if (file.size > 25 * 1024 * 1024) {
+      showToast('A imagem excede 25MB. Selecione uma imagem menor.', 'error');
       return;
     }
 
+    setIsUploadingImage(true);
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setCurrentBannerUrl(result);
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      setCurrentBannerUrl(base64);
       setEditorTab('editor');
-      showToast('Imagem de capa atualizada! Agora você pode posicionar as áreas clicáveis.');
+
+      try {
+        showToast('Gravando imagem no storage persistente...', 'info');
+        const uploadRes = await uploadImage(file);
+        if (uploadRes?.url) {
+          setCurrentBannerUrl(uploadRes.url);
+          showToast('Imagem salva no storage! Clique em "Salvar Alterações" para confirmar no banco.', 'success');
+        }
+      } catch (uploadErr: any) {
+        console.warn('Storage upload fallback:', uploadErr);
+        showToast('Imagem carregada! O servidor fará a persistência ao salvar.', 'info');
+      } finally {
+        setIsUploadingImage(false);
+      }
     };
     reader.readAsDataURL(file);
   };
 
-  // Save Event and Hotspots to Cloud/Database
+  // Save Event, Banner, Texts, and Hotspots permanently to Database
   const handleSaveInvite = async () => {
+    if (!event) return;
     setIsSaving(true);
     try {
+      let finalBannerUrl = currentBannerUrl;
+
+      // If user pasted a base64 image or upload was in progress, ensure it gets uploaded
+      if (finalBannerUrl && finalBannerUrl.startsWith('data:image')) {
+        try {
+          const uploadRes = await uploadImage(finalBannerUrl, 'cover');
+          if (uploadRes?.url) {
+            finalBannerUrl = uploadRes.url;
+            setCurrentBannerUrl(uploadRes.url);
+          }
+        } catch (uploadErr) {
+          console.warn('Image upload fallback during save:', uploadErr);
+        }
+      }
+
       const updated = await updateEvent(event.id, {
-        bannerUrl: currentBannerUrl,
-        title: eventTitle,
+        bannerUrl: finalBannerUrl,
+        title: eventTitle.trim() || event.title,
+        presentationText: presentationText.trim() || event.presentationText,
         coverHotspots: hotspots
       });
+
       onEventUpdated(updated);
       showToast('Alterações salvas com sucesso', 'success');
     } catch (err: any) {
@@ -968,6 +1003,38 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
 
               {/* Right Column: Hotspot Configuration Panel (5 cols) */}
               <div className="lg:col-span-5 space-y-4">
+
+                {/* Event Basic Info Config */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText size={14} className="text-teal-700" />
+                      <span>Título e Informações do Convite</span>
+                    </h3>
+                  </div>
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Título do Evento</label>
+                      <input
+                        type="text"
+                        value={eventTitle}
+                        onChange={(e) => setEventTitle(e.target.value)}
+                        placeholder="Ex: Workshop e Convenção Síndicos"
+                        className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-teal-700 focus:ring-1 focus:ring-teal-700 font-medium bg-slate-50 focus:bg-white transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Texto de Apresentação</label>
+                      <textarea
+                        rows={2}
+                        value={presentationText}
+                        onChange={(e) => setPresentationText(e.target.value)}
+                        placeholder="Ex: Preencha os dados abaixo para confirmar sua presença no evento..."
+                        className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-teal-700 focus:ring-1 focus:ring-teal-700 font-medium resize-none bg-slate-50 focus:bg-white transition"
+                      />
+                    </div>
+                  </div>
+                </div>
                 
                 {/* List of Configured Hotspots */}
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs">
