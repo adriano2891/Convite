@@ -85,7 +85,7 @@ function getInitialData(): DatabaseSchema {
     date: '2026-09-21',
     time: '14:00 às 16:00',
     location: 'Centro de Convenções Ativa',
-    address: 'R. Bela Cintra, 299 - 3 andar - Consolação-São Paulo - SP, 01415-001',
+    address: 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001',
     bannerUrl: '/covers/default-cover.png',
     logoUrl: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=300&q=80',
     presentationText: 'Bem-vindo ao Treinamento Intelbras para Síndicos & Zeladores. Confirme sua presença abaixo.',
@@ -112,7 +112,7 @@ function getInitialData(): DatabaseSchema {
         id: 'hs-2',
         name: 'Saber Como Chegar',
         actionType: 'google_maps',
-        targetUrl: 'https://maps.google.com/?q=R.+Bela+Cintra%2C+299+-+3+andar+-+Consola%C3%A7%C3%A3o-S%C3%A3o+Paulo+-+SP%2C+01415-001',
+        targetUrl: 'https://maps.google.com/?q=R.+Bela+Cintra%2C+299+-+3%C2%BA+andar+-+Consola%C3%A7%C3%A3o+-+S%C3%A3o+Paulo+-+SP%2C+01415-001',
         openInNewTab: true,
         x: 51.4,
         y: 70.5,
@@ -451,10 +451,25 @@ function loadDatabase(): DatabaseSchema {
           ev.logoUrl = persistBase64Image(ev.logoUrl, 'logo');
           migrated = true;
         }
+        if (ev.address && (ev.address.includes('3 andar') || !ev.address.includes('3º andar'))) {
+          ev.address = ev.address.replace('3 andar', '3º andar').replace('Consolação-São Paulo', 'Consolação - São Paulo');
+          if (ev.coverHotspots && Array.isArray(ev.coverHotspots)) {
+            ev.coverHotspots = ev.coverHotspots.map((hs) => {
+              if (hs.actionType === 'google_maps') {
+                return {
+                  ...hs,
+                  targetUrl: `https://maps.google.com/?q=${encodeURIComponent(ev.address)}`
+                };
+              }
+              return hs;
+            });
+          }
+          migrated = true;
+        }
       }
       if (migrated) {
         saveDatabase();
-        console.log('[DB] Migrated existing base64 images to persistent storage files.');
+        console.log('[DB] Migrated existing base64 images and event address to 3º andar.');
       }
       return db;
     }

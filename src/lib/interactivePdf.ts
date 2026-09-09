@@ -179,8 +179,8 @@ export async function generateInteractivePdf(options: GeneratePdfOptions): Promi
       id: 'hs-maps-default',
       name: 'Como Chegar (Maps)',
       actionType: 'google_maps',
-      targetUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        event.address || event.location || 'Grupo Ativa São Paulo'
+      targetUrl: `https://maps.google.com/?q=${encodeURIComponent(
+        event.address || 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001'
       )}`,
       openInNewTab: true,
       x: 15,

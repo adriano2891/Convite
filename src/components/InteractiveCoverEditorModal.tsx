@@ -113,8 +113,8 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
         id: 'hs-maps-2',
         name: 'Como Chegar (Maps)',
         actionType: 'google_maps',
-        targetUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          event?.address || event?.location || 'Grupo Ativa São Paulo'
+        targetUrl: `https://maps.google.com/?q=${encodeURIComponent(
+          event?.address || 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001'
         )}`,
         openInNewTab: true,
         x: 20,
@@ -251,11 +251,11 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
         openInNewTab: false
       });
     } else if (actionType === 'google_maps') {
-      const addr = event.address || event.location || 'Grupo Ativa Bela Cintra';
+      const addr = event.address || 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001';
       updateSelectedHotspot({
         name: 'Como Chegar (Google Maps)',
         actionType: 'google_maps',
-        targetUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`,
+        targetUrl: `https://maps.google.com/?q=${encodeURIComponent(addr)}`,
         openInNewTab: true
       });
     } else if (actionType === 'whatsapp') {

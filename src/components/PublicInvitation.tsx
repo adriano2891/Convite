@@ -261,7 +261,7 @@ export const PublicInvitation: React.FC<Props> = ({
                 date: '2026-09-21',
                 time: '14:00 às 16:00',
                 location: 'Centro de Convenções Ativa',
-                address: 'R. Bela Cintra, 299 - 3 andar - Consolação-São Paulo - SP, 01415-001',
+                address: 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001',
                 bannerUrl: '/covers/default-cover.png',
                 presentationText: 'Bem-vindo ao Treinamento Intelbras para Síndicos & Zeladores. Confirme sua presença abaixo.',
                 requireJanitor: true,
@@ -285,7 +285,7 @@ export const PublicInvitation: React.FC<Props> = ({
                     id: 'hs-2',
                     name: 'Saber Como Chegar',
                     actionType: 'google_maps',
-                    targetUrl: 'https://maps.google.com/?q=R.+Bela+Cintra%2C+299+-+3+andar+-+Consola%C3%A7%C3%A3o-S%C3%A3o+Paulo+-+SP%2C+01415-001',
+                    targetUrl: 'https://maps.google.com/?q=R.+Bela+Cintra%2C+299+-+3%C2%BA+andar+-+Consola%C3%A7%C3%A3o+-+S%C3%A3o+Paulo+-+SP%2C+01415-001',
                     openInNewTab: true,
                     x: 51.4,
                     y: 70.5,
@@ -584,8 +584,8 @@ export const PublicInvitation: React.FC<Props> = ({
             id: 'hs-maps-default',
             name: 'Como Chegar (Maps)',
             actionType: 'google_maps' as const,
-            targetUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-              event?.address || event?.location || 'Grupo Ativa São Paulo'
+            targetUrl: `https://maps.google.com/?q=${encodeURIComponent(
+              event?.address || 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001'
             )}`,
             openInNewTab: true,
             x: 15,

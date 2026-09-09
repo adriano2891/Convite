@@ -53,7 +53,7 @@ const QUICK_COVER_PRESETS = [
   }
 ];
 
-export const DEFAULT_EVENT_ADDRESS = 'R. Bela Cintra, 299 - 3 andar - Consolação-São Paulo - SP, 01415-001';
+export const DEFAULT_EVENT_ADDRESS = 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001';
 
 interface Props {
   isOpen: boolean;

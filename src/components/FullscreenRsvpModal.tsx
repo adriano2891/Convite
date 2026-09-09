@@ -511,9 +511,10 @@ export const FullscreenRsvpModal: React.FC<FullscreenRsvpModalProps> = ({
                     <span className="truncate">{event.address}</span>
                   </div>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      `${event.location}, ${event.address}`
-                    )}`}
+                    href={
+                      event.coverHotspots?.find((hs) => hs.actionType === 'google_maps')?.targetUrl ||
+                      `https://maps.google.com/?q=${encodeURIComponent(event.address)}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-teal-700 hover:text-teal-900 font-bold shrink-0 inline-flex items-center gap-1"
