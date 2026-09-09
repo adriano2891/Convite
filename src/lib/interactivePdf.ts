@@ -10,8 +10,8 @@ export interface OptimizedImageData {
 
 /**
  * Loads and prepares an image for PDF embedding:
- * Scales to crisp resolution (max 1240px) and compresses to ~120-200 KB
- * so WhatsApp Web and mobile can instantly open and preview it without delay.
+ * Scales to crisp resolution (max 1200px) and compresses to ~135-144 KB
+ * so WhatsApp Web and mobile can instantly generate the inline cover preview and page count.
  */
 async function loadAndOptimizeImageData(url: string): Promise<OptimizedImageData> {
   return new Promise((resolve, reject) => {
@@ -20,8 +20,8 @@ async function loadAndOptimizeImageData(url: string): Promise<OptimizedImageData
         const naturalW = img.naturalWidth || img.width || 1200;
         const naturalH = img.naturalHeight || img.height || 1600;
 
-        // Balance crisp resolution with fast loading and small file size (~150KB)
-        const MAX_DIM = 1400;
+        // Balance crisp resolution with optimal file size (< 145 KB) for WhatsApp inline thumbnail preview
+        const MAX_DIM = 1200;
         let targetW = naturalW;
         let targetH = naturalH;
 
@@ -37,11 +37,25 @@ async function loadAndOptimizeImageData(url: string): Promise<OptimizedImageData
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Contexto de canvas indisponível');
 
+        // Fill with solid white background to avoid dark/black transparency artifacts in JPEG
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, targetW, targetH);
+
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, targetW, targetH);
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        // Target ~135-144 KB for WhatsApp document preview threshold
+        let dataUrl = canvas.toDataURL('image/jpeg', 0.80);
+
+        // Approximate size in bytes from base64 string
+        const base64Data = dataUrl.split(',')[1] || '';
+        const approxBytes = Math.round((base64Data.length * 3) / 4);
+
+        // If slightly too large (> 140 KB), adjust quality slightly to keep under 145 KB limit
+        if (approxBytes > 140 * 1024) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.76);
+        }
 
         resolve({
           dataUrl,
@@ -282,6 +296,28 @@ export async function generateInteractivePdf(options: GeneratePdfOptions): Promi
         console.warn('Aviso: falha ao inserir anotação de link:', err);
       }
     });
+
+    // Normalize annotation coordinates [llx, lly, urx, ury] where lly <= ury (ISO 32000-1)
+    // jsPDF internally computes top-y and bottom-y which can result in lly > ury.
+    // Strict mobile PDF renderers (Android PdfRenderer / PDF.js) require lly <= ury to generate previews.
+    try {
+      const pageInfo = (pdf as any).internal?.getCurrentPageInfo?.();
+      if (pageInfo?.pageContext?.annotations) {
+        pageInfo.pageContext.annotations.forEach((annot: any) => {
+          if (annot.finalBounds) {
+            const y1 = parseFloat(annot.finalBounds.y);
+            const y2 = parseFloat(annot.finalBounds.h);
+            if (y1 > y2) {
+              const temp = annot.finalBounds.y;
+              annot.finalBounds.y = annot.finalBounds.h;
+              annot.finalBounds.h = temp;
+            }
+          }
+        });
+      }
+    } catch {
+      // Non-critical optimization
+    }
   }
 
   if (onProgress) onProgress('Finalizando arquivo...');

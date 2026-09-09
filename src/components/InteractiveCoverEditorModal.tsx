@@ -843,7 +843,7 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
                                 <span>•</span>
                                 <span>PDF</span>
                                 <span>•</span>
-                                <span className="text-emerald-400 font-semibold">169 KB</span>
+                                <span className="text-emerald-400 font-semibold">144 KB</span>
                               </div>
                             </div>
 
@@ -861,7 +861,7 @@ export const InteractiveCoverEditorModal: React.FC<Props> = ({
                             Capa e Miniatura Configuradas
                           </p>
                           <p className="text-slate-300 text-[10px] leading-relaxed">
-                            O PDF gerado possui metadados oficiais e tamanho otimizado (~169 KB) com miniatura (/Thumb). Ao enviar como documento no WhatsApp, a capa é exibida imediatamente como miniatura e todos os links continuam clicáveis.
+                            O PDF gerado possui metadados oficiais e tamanho ultraleve (~144 KB). Ao enviar como documento no WhatsApp, a capa é exibida imediatamente como miniatura no topo e todos os links continuam clicáveis.
                           </p>
                         </div>
 

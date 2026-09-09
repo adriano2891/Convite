@@ -644,7 +644,7 @@ export const SocialPreviewSection: React.FC<Props> = ({
                         <span>•</span>
                         <span>PDF</span>
                         <span>•</span>
-                        <span className="text-emerald-400 font-semibold">169 KB</span>
+                        <span className="text-emerald-400 font-semibold">144 KB</span>
                       </div>
                     </div>
 
@@ -661,7 +661,7 @@ export const SocialPreviewSection: React.FC<Props> = ({
                     Envio como Documento com Miniatura
                   </p>
                   <p className="text-slate-300 text-[10px] leading-relaxed">
-                    O PDF gerado tem metadados de miniatura e tamanho otimizado (~169 KB). Ao ser compartilhado como documento no WhatsApp, exibe a capa com miniatura nítida e mantém todos os botões clicáveis.
+                    O PDF gerado tem metadados de miniatura e tamanho ultraleve (~144 KB). Ao ser compartilhado como documento no WhatsApp, exibe a capa com miniatura nítida no topo e mantém todos os botões clicáveis.
                   </p>
                 </div>
 

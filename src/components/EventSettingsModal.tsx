@@ -53,6 +53,8 @@ const QUICK_COVER_PRESETS = [
   }
 ];
 
+export const DEFAULT_EVENT_ADDRESS = 'R. Bela Cintra, 299 - 3 andar - Consolação-São Paulo - SP, 01415-001';
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -77,7 +79,7 @@ export const EventSettingsModal: React.FC<Props> = ({
   const [date, setDate] = useState(currentEvent?.date || '');
   const [time, setTime] = useState(currentEvent?.time || '');
   const [location, setLocation] = useState(currentEvent?.location || '');
-  const [address, setAddress] = useState(currentEvent?.address || '');
+  const [address, setAddress] = useState(currentEvent?.address || DEFAULT_EVENT_ADDRESS);
   const [bannerUrl, setBannerUrl] = useState(currentEvent?.bannerUrl || '');
   const [logoUrl, setLogoUrl] = useState(currentEvent?.logoUrl || '');
   const [presentationText, setPresentationText] = useState(currentEvent?.presentationText || '');
@@ -136,7 +138,7 @@ export const EventSettingsModal: React.FC<Props> = ({
       setDate(currentEvent.date || '');
       setTime(currentEvent.time || '');
       setLocation(currentEvent.location || '');
-      setAddress(currentEvent.address || '');
+      setAddress(currentEvent.address || DEFAULT_EVENT_ADDRESS);
       setBannerUrl(currentEvent.bannerUrl || '');
       setLogoUrl(currentEvent.logoUrl || '');
       setPresentationText(currentEvent.presentationText || '');
@@ -224,6 +226,7 @@ export const EventSettingsModal: React.FC<Props> = ({
         date: newDate,
         time: newTime,
         location: 'Auditório Principal',
+        address: DEFAULT_EVENT_ADDRESS,
         maxParticipants: 50
       });
 
@@ -383,10 +386,11 @@ export const EventSettingsModal: React.FC<Props> = ({
                     Horário
                   </label>
                   <input
-                    type="time"
+                    type="text"
                     required
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
+                    placeholder="Ex: 14h às 16h ou 14:00"
                     className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 transition"
                   />
                 </div>
@@ -413,7 +417,7 @@ export const EventSettingsModal: React.FC<Props> = ({
                     type="text"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Ex: Av. Paulista, 2100 - São Paulo"
+                    placeholder={DEFAULT_EVENT_ADDRESS}
                     className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-teal-600 transition"
                   />
                 </div>

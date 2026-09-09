@@ -83,9 +83,9 @@ function getInitialData(): DatabaseSchema {
     id: 'evt-2026-seguranca',
     title: 'Treinamento Intelbras',
     date: '2026-09-21',
-    time: '14:00',
+    time: '14:00 às 16:00',
     location: 'Centro de Convenções Ativa',
-    address: 'Av. Paulista, 1000 - Bela Vista, SP',
+    address: 'R. Bela Cintra, 299 - 3 andar - Consolação-São Paulo - SP, 01415-001',
     bannerUrl: '/covers/default-cover.png',
     logoUrl: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=300&q=80',
     presentationText: 'Bem-vindo ao Treinamento Intelbras para Síndicos & Zeladores. Confirme sua presença abaixo.',
@@ -103,21 +103,21 @@ function getInitialData(): DatabaseSchema {
         actionType: 'confirm_rsvp',
         targetUrl: '#formulario',
         openInNewTab: false,
-        x: 6.0,
-        y: 55.1,
-        width: 42.3,
-        height: 6.4
+        x: 9.2,
+        y: 70.5,
+        width: 39.4,
+        height: 7.1
       },
       {
         id: 'hs-2',
-        name: 'Como Chegar',
+        name: 'Saber Como Chegar',
         actionType: 'google_maps',
-        targetUrl: 'https://maps.google.com/?q=Av.+Paulista,+1000+-+Bela+Vista,+SP',
+        targetUrl: 'https://maps.google.com/?q=R.+Bela+Cintra%2C+299+-+3+andar+-+Consola%C3%A7%C3%A3o-S%C3%A3o+Paulo+-+SP%2C+01415-001',
         openInNewTab: true,
-        x: 51.8,
-        y: 55.1,
-        width: 42.3,
-        height: 6.4
+        x: 51.4,
+        y: 70.5,
+        width: 39.4,
+        height: 7.1
       }
     ],
     whatsappTemplates: { ...defaultTemplates },
@@ -906,6 +906,18 @@ app.put('/api/events/:id', (req, res) => {
     ...payload,
     updatedAt: new Date().toISOString()
   };
+
+  if (updated.address && updated.coverHotspots && Array.isArray(updated.coverHotspots)) {
+    updated.coverHotspots = updated.coverHotspots.map((hs) => {
+      if (hs.actionType === 'google_maps') {
+        return {
+          ...hs,
+          targetUrl: `https://maps.google.com/?q=${encodeURIComponent(updated.address)}`
+        };
+      }
+      return hs;
+    });
+  }
 
   db.events[eventIndex] = updated;
   saveDatabase();
