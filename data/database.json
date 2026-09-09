@@ -34,10 +34,10 @@
           "actionType": "confirm_rsvp",
           "targetUrl": "#formulario",
           "openInNewTab": false,
-          "x": 9.2,
-          "y": 70.5,
-          "width": 39.4,
-          "height": 7.1
+          "x": 5.6,
+          "y": 64.5,
+          "width": 43.4,
+          "height": 6.0
         },
         {
           "id": "hs-2",
@@ -45,10 +45,10 @@
           "actionType": "google_maps",
           "targetUrl": "https://maps.google.com/?q=R.+Bela+Cintra%2C+299+-+3%C2%BA+andar+-+Consola%C3%A7%C3%A3o+-+S%C3%A3o+Paulo+-+SP%2C+01415-001",
           "openInNewTab": true,
-          "x": 51.4,
-          "y": 70.5,
-          "width": 39.4,
-          "height": 7.1
+          "x": 51.3,
+          "y": 64.4,
+          "width": 43.3,
+          "height": 6.0
         }
       ]
     }
