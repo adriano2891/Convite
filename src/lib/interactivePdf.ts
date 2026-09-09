@@ -144,6 +144,7 @@ export interface GeneratePdfOptions {
   invitationCode?: string;
   onProgress?: (status: string) => void;
   autoDownload?: boolean;
+  mobileFormat?: boolean;
 }
 
 export interface GeneratedPdfResult {
@@ -210,16 +211,42 @@ export async function generateInteractivePdf(options: GeneratePdfOptions): Promi
   const isLandscape = imgInfo.width > imgInfo.height;
   const aspect = imgInfo.height / imgInfo.width;
 
-  // Base A4 width: 595.28 pt. Proportional height preserves exact invitation design.
+  const isMobileClient =
+    options.mobileFormat ??
+    (typeof window !== 'undefined' &&
+      (/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '') || window.innerWidth < 640));
+
+  // Base A4 width: 595.28 pt.
   let targetWidthPt: number;
   let targetHeightPt: number;
+  let imgDrawX = 0;
+  let imgDrawY = 0;
+  let imgDrawW: number;
+  let imgDrawH: number;
 
   if (isLandscape) {
     targetWidthPt = 841.89;
     targetHeightPt = Math.round(841.89 * aspect * 100) / 100;
+    imgDrawW = targetWidthPt;
+    imgDrawH = targetHeightPt;
+  } else if (isMobileClient) {
+    // For mobile viewers (e.g. Android Google Drive / WhatsApp PDF viewer),
+    // format the PDF page to match mobile screen proportions (19.5:9 or screen ratio)
+    // with seamless #f6fafb canvas background so it uses 100% of the mobile screen height & width without black bars!
+    targetWidthPt = 595.28;
+    const screenRatio =
+      typeof window !== 'undefined' && window.innerHeight > window.innerWidth
+        ? Math.min(2.18, Math.max(aspect, window.innerHeight / window.innerWidth))
+        : Math.max(aspect, 19.2 / 9);
+    targetHeightPt = Math.round(targetWidthPt * screenRatio * 100) / 100;
+    imgDrawW = targetWidthPt;
+    imgDrawH = Math.round(targetWidthPt * aspect * 100) / 100;
+    imgDrawY = Math.max(0, Math.round(((targetHeightPt - imgDrawH) / 2) * 100) / 100);
   } else {
     targetWidthPt = 595.28;
     targetHeightPt = Math.round(595.28 * aspect * 100) / 100;
+    imgDrawW = targetWidthPt;
+    imgDrawH = targetHeightPt;
   }
 
   // Create clean, strictly standard jsPDF instance
@@ -230,23 +257,27 @@ export async function generateInteractivePdf(options: GeneratePdfOptions): Promi
     compress: true
   });
 
+  // Fill canvas background with clean Ativa light canvas tone (#f6fafb)
+  pdf.setFillColor(246, 251, 251);
+  pdf.rect(0, 0, targetWidthPt, targetHeightPt, 'F');
+
   // Standard Document Properties
   const cleanTitle = event.title ? event.title.trim() : 'CONVITE';
   pdf.setProperties({
     title: cleanTitle.toUpperCase(),
     subject: 'Convite Interativo Oficial',
     author: 'Grupo Ativa',
-    creator: 'Grupo Ativa - Soluções Condominiais'
+    creator: 'Grupo Ativa • Gestão Corporativa de Eventos, Palestra e Treinamentos'
   });
 
   // Draw full-bleed invitation cover image
   pdf.addImage(
     imgInfo.dataUrl,
     'JPEG',
-    0,
-    0,
-    targetWidthPt,
-    targetHeightPt,
+    imgDrawX,
+    imgDrawY,
+    imgDrawW,
+    imgDrawH,
     undefined,
     'FAST'
   );
@@ -260,10 +291,10 @@ export async function generateInteractivePdf(options: GeneratePdfOptions): Promi
   if (hotspots && hotspots.length > 0) {
     if (onProgress) onProgress('Configurando links e botões interativos...');
     hotspots.forEach((spot) => {
-      const linkX = (spot.x / 100) * targetWidthPt;
-      const linkY = (spot.y / 100) * targetHeightPt;
-      const linkW = (spot.width / 100) * targetWidthPt;
-      const linkH = (spot.height / 100) * targetHeightPt;
+      const linkX = imgDrawX + (spot.x / 100) * imgDrawW;
+      const linkY = imgDrawY + (spot.y / 100) * imgDrawH;
+      const linkW = (spot.width / 100) * imgDrawW;
+      const linkH = (spot.height / 100) * imgDrawH;
 
       let destinationUrl = spot.targetUrl?.trim();
 

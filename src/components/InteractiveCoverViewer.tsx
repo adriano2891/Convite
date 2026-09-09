@@ -33,6 +33,7 @@ export const InteractiveCoverViewer: React.FC<Props> = ({
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [currentSrc, setCurrentSrc] = useState<string>(imageUrl || '/covers/default-cover.png');
   const [hasError, setHasError] = useState<boolean>(false);
+  const [aspectRatio, setAspectRatio] = useState<number>(1054 / 1492);
 
   useEffect(() => {
     setCurrentSrc(imageUrl || '/covers/default-cover.png');
@@ -144,96 +145,120 @@ export const InteractiveCoverViewer: React.FC<Props> = ({
 
   return (
     <div
-      ref={containerRef}
-      className={`relative w-full overflow-hidden select-none ${className}`}
+      className={`relative w-full h-full max-h-[100dvh] flex items-center justify-center overflow-hidden select-none ${className}`}
       style={{ touchAction: 'pan-y' }}
     >
-      {/* Background artwork */}
-      <img
-        src={currentSrc}
-        alt={altText}
-        referrerPolicy="no-referrer"
-        onError={handleImageError}
-        onLoad={(e) => {
-          const target = e.currentTarget;
-          if (onImageLoad) {
-            onImageLoad({
-              naturalWidth: target.naturalWidth,
-              naturalHeight: target.naturalHeight
-            });
-          }
+      {/* Ambient backdrop that fills 100% of height and width on mobile screens to eliminate black borders */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none sm:hidden">
+        <img
+          src={currentSrc}
+          alt=""
+          aria-hidden="true"
+          className="w-full h-full object-cover blur-2xl opacity-40 scale-125"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-transparent to-white/80" />
+      </div>
+
+      {/* Sized container that matches the exact rendered image dimensions for pixel-perfect hotspot alignment */}
+      <div
+        ref={containerRef}
+        className="relative select-none max-w-full max-h-[100dvh] w-full flex items-center justify-center"
+        style={{
+          aspectRatio: `${aspectRatio}`,
+          maxHeight: '100dvh',
+          maxWidth: '100vw'
         }}
-        className="w-full h-auto block object-contain pointer-events-none"
-      />
+      >
+        {/* Main sharp cover image */}
+        <img
+          src={currentSrc}
+          alt={altText}
+          referrerPolicy="no-referrer"
+          onError={handleImageError}
+          onLoad={(e) => {
+            const target = e.currentTarget;
+            if (target.naturalWidth && target.naturalHeight) {
+              setAspectRatio(target.naturalWidth / target.naturalHeight);
+            }
+            if (onImageLoad) {
+              onImageLoad({
+                naturalWidth: target.naturalWidth,
+                naturalHeight: target.naturalHeight
+              });
+            }
+          }}
+          className="w-full h-full max-h-[100dvh] max-w-[100vw] block object-contain pointer-events-none"
+        />
 
-      {/* Hotspots Overlay Layer */}
-      {hotspots.map((spot) => {
-        const isSelected = selectedHotspotId === spot.id;
-        const isFeedback = activeFeedbackId === spot.id;
+        {/* Hotspots Overlay Layer */}
+        {hotspots.map((spot) => {
+          const isSelected = selectedHotspotId === spot.id;
+          const isFeedback = activeFeedbackId === spot.id;
 
-        // In Guest Mode (showHotspotBorders = false): 100% invisible!
-        // No border, no background, no shadow. Instant 1-tap/1-click touch response.
-        if (!showHotspotBorders) {
+          // In Guest Mode (showHotspotBorders = false): 100% invisible!
+          // No border, no background, no shadow. Instant 1-tap/1-click touch response.
+          if (!showHotspotBorders) {
+            return (
+              <button
+                key={spot.id}
+                type="button"
+                id={`hotspot-btn-${spot.id}`}
+                onClick={(e) => handleHotspotClick(e, spot)}
+                title={spot.name || 'Clique para interagir'}
+                aria-label={spot.name || 'Área interativa'}
+                style={{
+                  left: `${spot.x}%`,
+                  top: `${spot.y}%`,
+                  width: `${spot.width}%`,
+                  height: `${spot.height}%`,
+                  touchAction: 'manipulation'
+                }}
+                className={`absolute cursor-pointer border-0 outline-none p-0 m-0 z-20 transition-opacity focus:outline-none ${
+                  isFeedback ? 'bg-teal-500/20' : 'bg-transparent'
+                }`}
+              />
+            );
+          }
+
+          // In Admin Edit Mode (showHotspotBorders = true): Highlighted outline & badge
           return (
-            <button
+            <div
               key={spot.id}
-              type="button"
-              id={`hotspot-btn-${spot.id}`}
               onClick={(e) => handleHotspotClick(e, spot)}
-              title={spot.name || 'Clique para interagir'}
-              aria-label={spot.name || 'Área interativa'}
               style={{
                 left: `${spot.x}%`,
                 top: `${spot.y}%`,
                 width: `${spot.width}%`,
-                height: `${spot.height}%`,
-                touchAction: 'manipulation'
+                height: `${spot.height}%`
               }}
-              className={`absolute cursor-pointer border-0 outline-none p-0 m-0 z-20 transition-opacity focus:outline-none ${
-                isFeedback ? 'bg-teal-500/20' : 'bg-transparent'
+              className={`absolute cursor-pointer transition-all duration-150 rounded-md flex flex-col justify-between p-1 z-10 ${
+                isSelected
+                  ? 'border-2 border-teal-500 bg-teal-500/25 shadow-lg ring-2 ring-teal-400/50'
+                  : 'border-2 border-dashed border-sky-400 bg-sky-500/15 hover:bg-sky-500/25 hover:border-sky-300'
               }`}
-            />
-          );
-        }
-
-        // In Admin Edit Mode (showHotspotBorders = true): Highlighted outline & badge
-        return (
-          <div
-            key={spot.id}
-            onClick={(e) => handleHotspotClick(e, spot)}
-            style={{
-              left: `${spot.x}%`,
-              top: `${spot.y}%`,
-              width: `${spot.width}%`,
-              height: `${spot.height}%`
-            }}
-            className={`absolute cursor-pointer transition-all duration-150 rounded-md flex flex-col justify-between p-1 z-10 ${
-              isSelected
-                ? 'border-2 border-teal-500 bg-teal-500/25 shadow-lg ring-2 ring-teal-400/50'
-                : 'border-2 border-dashed border-sky-400 bg-sky-500/15 hover:bg-sky-500/25 hover:border-sky-300'
-            }`}
-          >
-            {/* Top Action Badge */}
-            <div className="flex items-center justify-between gap-1 overflow-hidden">
-              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900/90 text-white shadow-xs truncate max-w-full">
-                <Sparkles size={10} className="text-teal-400 shrink-0" />
-                <span className="truncate">{spot.name || 'Área Clicável'}</span>
-              </span>
-
-              {spot.openInNewTab && (
-                <span className="p-0.5 rounded bg-slate-900/80 text-white shrink-0" title="Abre em nova aba">
-                  <ExternalLink size={9} />
+            >
+              {/* Top Action Badge */}
+              <div className="flex items-center justify-between gap-1 overflow-hidden">
+                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900/90 text-white shadow-xs truncate max-w-full">
+                  <Sparkles size={10} className="text-teal-400 shrink-0" />
+                  <span className="truncate">{spot.name || 'Área Clicável'}</span>
                 </span>
-              )}
-            </div>
 
-            {/* Bottom URL preview */}
-            <div className="text-[9px] font-mono text-white bg-slate-950/80 px-1 py-0.2 rounded truncate max-w-full">
-              {spot.targetUrl || '#formulario'}
+                {spot.openInNewTab && (
+                  <span className="p-0.5 rounded bg-slate-900/80 text-white shrink-0" title="Abre em nova aba">
+                    <ExternalLink size={9} />
+                  </span>
+                )}
+              </div>
+
+              {/* Bottom URL preview */}
+              <div className="text-[9px] font-mono text-white bg-slate-950/80 px-1 py-0.2 rounded truncate max-w-full">
+                {spot.targetUrl || '#formulario'}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };

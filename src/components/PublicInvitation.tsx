@@ -615,19 +615,17 @@ export const PublicInvitation: React.FC<Props> = ({
 
   return (
     <div
-      className="min-h-screen min-h-[100dvh] w-full max-w-full overflow-x-hidden text-slate-800 py-3 sm:py-6 px-3 sm:px-4 md:px-6 flex flex-col justify-between"
+      className="min-h-screen min-h-[100dvh] h-[100dvh] sm:h-auto w-full max-w-full overflow-hidden sm:overflow-x-hidden text-slate-800 p-0 sm:py-6 sm:px-4 md:px-6 flex flex-col justify-between"
       style={{
-        paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
-        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
         background:
           'radial-gradient(1100px 700px at 50% 0%, rgba(0, 122, 120, 0.12) 0%, transparent 60%), radial-gradient(850px 550px at 90% 90%, rgba(15, 118, 110, 0.08) 0%, transparent 55%), linear-gradient(165deg, #e6f6f5 0%, #f4faf9 30%, #ffffff 65%, #ddf2f0 100%)'
       }}
     >
-      <div className="max-w-xl md:max-w-2xl mx-auto w-full flex-1 flex flex-col justify-center space-y-3 sm:space-y-4 my-auto">
+      <div className="w-full h-full min-h-[100dvh] sm:min-h-0 sm:max-w-xl md:max-w-2xl mx-auto flex-1 flex flex-col justify-center sm:space-y-3 sm:space-y-4 sm:my-auto overflow-hidden">
 
         {/* Feedback Toast */}
         {toastNotice && (
-          <div className="bg-[#007A78] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center justify-between animate-fade-in">
+          <div className="fixed sm:static top-3 left-3 right-3 z-40 bg-[#007A78] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center justify-between animate-fade-in">
             <div className="flex items-center gap-2">
               <Sparkles size={15} className="text-teal-200 shrink-0" />
               <span>{toastNotice}</span>
@@ -640,7 +638,7 @@ export const PublicInvitation: React.FC<Props> = ({
 
         {/* Card Principal do Convite com degrade nos tons claros da logo Ativa */}
         <div
-          className="rounded-2xl sm:rounded-3xl overflow-hidden border border-teal-200/90 shadow-2xl shadow-teal-950/10"
+          className="w-full h-full min-h-[100dvh] sm:min-h-0 rounded-none sm:rounded-3xl overflow-hidden border-0 sm:border border-teal-200/90 shadow-none sm:shadow-2xl flex flex-col justify-center items-center relative"
           style={{
             background: 'linear-gradient(155deg, #ffffff 0%, #f6fbfb 50%, #edf7f6 100%)'
           }}
@@ -648,7 +646,7 @@ export const PublicInvitation: React.FC<Props> = ({
           {/* Arte / Capa Interativa Oficial com Hiperlinks Invisíveis */}
           {event?.bannerUrl ? (
             <div
-              className="w-full overflow-hidden flex items-center justify-center"
+              className="w-full h-full min-h-[100dvh] sm:min-h-0 overflow-hidden flex items-center justify-center"
               style={{
                 background: 'linear-gradient(145deg, #e8f7f6 0%, #f4faf9 50%, #e1f4f2 100%)'
               }}
@@ -660,6 +658,7 @@ export const PublicInvitation: React.FC<Props> = ({
                 showHotspotBorders={false}
                 interactive={true}
                 onActionTrigger={handleCoverActionTrigger}
+                className="w-full h-full min-h-[100dvh] sm:min-h-0"
               />
             </div>
           ) : (
@@ -694,9 +693,34 @@ export const PublicInvitation: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Rodapé institucional discreto */}
-        <div className="text-center text-[11px] text-slate-500 font-medium py-2">
-          Grupo Ativa • Gestão Corporativa de Eventos e Condomínios
+        {/* Floating Quick Action Bar on Mobile for instant 1-tap confirmation */}
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30 p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-slate-950/90 via-slate-900/60 to-transparent flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={openFullscreenForm}
+            className="flex-1 max-w-[210px] py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+          >
+            <CheckCircle2 size={16} className="text-emerald-200" />
+            <span>Confirmar Presença</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(
+                event?.address || 'R. Bela Cintra, 299 - 3º andar - Consolação - São Paulo - SP, 01415-001'
+              )}`;
+              window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+            }}
+            className="flex-1 max-w-[180px] py-2.5 px-3 bg-white/95 hover:bg-white active:bg-slate-100 text-teal-900 rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-1.5 cursor-pointer border border-teal-200 active:scale-95 transition-all"
+          >
+            <MapPin size={16} className="text-teal-600" />
+            <span>Como Chegar</span>
+          </button>
+        </div>
+
+        {/* Rodapé institucional discreto no Desktop */}
+        <div className="hidden sm:block text-center text-[11px] text-slate-500 font-medium py-2">
+          Grupo Ativa • Gestão Corporativa de Eventos, Palestra e Treinamentos
         </div>
       </div>
 
